@@ -1,0 +1,27 @@
+# Core Frameworks
+fastapi
+uvicorn[standard]
+pydantic
+pydantic-settings
+
+# Worker & Queue
+celery
+redis
+
+# Database
+sqlalchemy
+alembic
+aiosqlite
+
+# Security & Rate Limiting
+slowapi
+python-jose[cryptography]
+passlib[bcrypt]
+python-multipart
+
+# Utilities
+python-dotenv
+httpx
+loguru
+aiofiles
+yt-dlp
