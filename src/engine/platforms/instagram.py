@@ -30,6 +30,16 @@ class InstagramDownloader(BaseDownloader):
                 'skip_download': True,
             }
             
+            # Add cookies file if exists (copy to temp to avoid permission issues)
+            cookies_path = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), 'cookies', 'instagram_cookies.txt')
+            if os.path.exists(cookies_path):
+                import shutil
+                import tempfile
+                temp_cookies = os.path.join(tempfile.gettempdir(), f'ig_cookies_{os.getpid()}.txt')
+                shutil.copy2(cookies_path, temp_cookies)
+                ydl_opts['cookiefile'] = temp_cookies
+                logger.info(f"[{self.platform}] Using cookies from: {cookies_path}")
+            
             with yt_dlp.YoutubeDL(ydl_opts) as ydl:
                 info = ydl.extract_info(url, download=False)
                 
@@ -108,6 +118,16 @@ class InstagramDownloader(BaseDownloader):
                 'no_warnings': True,
                 'skip_download': True,
             }
+            
+            # Add cookies file if exists (copy to temp to avoid permission issues)
+            cookies_path = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), 'cookies', 'instagram_cookies.txt')
+            if os.path.exists(cookies_path):
+                import shutil
+                import tempfile
+                temp_cookies = os.path.join(tempfile.gettempdir(), f'ig_cookies_{os.getpid()}.txt')
+                shutil.copy2(cookies_path, temp_cookies)
+                ydl_opts_info['cookiefile'] = temp_cookies
+                logger.info(f"[{self.platform}] Using cookies for download")
             
             with yt_dlp.YoutubeDL(ydl_opts_info) as ydl:
                 logger.info(f"[{self.platform}] Extracting metadata...")
