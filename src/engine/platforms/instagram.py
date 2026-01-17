@@ -155,47 +155,50 @@ class InstagramDownloader(BaseDownloader):
             downloads = []
             downloaded_media = []
             
+            # Prepare cookies path for download opts
+            temp_cookies = os.path.join(tempfile.gettempdir(), 'ig_cookies_librarydown.txt')
+            
             if is_audio_only:
                 # Only download audio
-                downloads.append({
-                    'type': 'audio',
-                    'opts': {
-                        'format': 'bestaudio/best',
-                        'quiet': True,
-                        'no_warnings': True,
-                        'outtmpl': os.path.join(settings.MEDIA_FOLDER, f'{video_id}_audio.%(ext)s'),
-                        'postprocessors': [{
-                            'key': 'FFmpegExtractAudio',
-                            'preferredcodec': 'm4a',
-                        }],
-                    }
-                })
+                download_opts = {
+                    'format': 'bestaudio/best',
+                    'quiet': True,
+                    'no_warnings': True,
+                    'outtmpl': os.path.join(settings.MEDIA_FOLDER, f'{video_id}_audio.%(ext)s'),
+                    'postprocessors': [{
+                        'key': 'FFmpegExtractAudio',
+                        'preferredcodec': 'm4a',
+                    }],
+                }
+                if os.path.exists(temp_cookies):
+                    download_opts['cookiefile'] = temp_cookies
+                downloads.append({'type': 'audio', 'opts': download_opts})
             else:
                 # Download video
-                downloads.append({
-                    'type': 'video',
-                    'opts': {
-                        'format': 'best',
-                        'quiet': True,
-                        'no_warnings': True,
-                        'outtmpl': os.path.join(settings.MEDIA_FOLDER, f'{video_id}.%(ext)s'),
-                    }
-                })
+                video_opts = {
+                    'format': 'best',
+                    'quiet': True,
+                    'no_warnings': True,
+                    'outtmpl': os.path.join(settings.MEDIA_FOLDER, f'{video_id}.%(ext)s'),
+                }
+                if os.path.exists(temp_cookies):
+                    video_opts['cookiefile'] = temp_cookies
+                downloads.append({'type': 'video', 'opts': video_opts})
                 
                 # Also download audio
-                downloads.append({
-                    'type': 'audio',
-                    'opts': {
-                        'format': 'bestaudio/best',
-                        'quiet': True,
-                        'no_warnings': True,
-                        'outtmpl': os.path.join(settings.MEDIA_FOLDER, f'{video_id}_audio.%(ext)s'),
-                        'postprocessors': [{
-                            'key': 'FFmpegExtractAudio',
-                            'preferredcodec': 'm4a',
-                        }],
-                    }
-                })
+                audio_opts = {
+                    'format': 'bestaudio/best',
+                    'quiet': True,
+                    'no_warnings': True,
+                    'outtmpl': os.path.join(settings.MEDIA_FOLDER, f'{video_id}_audio.%(ext)s'),
+                    'postprocessors': [{
+                        'key': 'FFmpegExtractAudio',
+                        'preferredcodec': 'm4a',
+                    }],
+                }
+                if os.path.exists(temp_cookies):
+                    audio_opts['cookiefile'] = temp_cookies
+                downloads.append({'type': 'audio', 'opts': audio_opts})
             
             # Download all formats
             for download_info in downloads:
