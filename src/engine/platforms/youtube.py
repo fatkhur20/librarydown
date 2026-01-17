@@ -30,10 +30,14 @@ class YouTubeDownloader(BaseDownloader):
                 'skip_download': True,
             }
             
-            # Add cookies file if exists
+            # Add cookies file if exists (copy to temp to avoid permission issues)
             cookies_path = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), 'cookies', 'youtube_cookies.txt')
             if os.path.exists(cookies_path):
-                ydl_opts['cookiefile'] = cookies_path
+                import shutil
+                import tempfile
+                temp_cookies = os.path.join(tempfile.gettempdir(), f'yt_cookies_{os.getpid()}.txt')
+                shutil.copy2(cookies_path, temp_cookies)
+                ydl_opts['cookiefile'] = temp_cookies
                 logger.info(f"[{self.platform}] Using cookies from: {cookies_path}")
             
             with yt_dlp.YoutubeDL(ydl_opts) as ydl:
@@ -159,10 +163,14 @@ class YouTubeDownloader(BaseDownloader):
                 'skip_download': True,
             }
             
-            # Add cookies file if exists
+            # Add cookies file if exists (copy to temp to avoid permission issues)
             cookies_path = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), 'cookies', 'youtube_cookies.txt')
             if os.path.exists(cookies_path):
-                ydl_opts_info['cookiefile'] = cookies_path
+                import shutil
+                import tempfile
+                temp_cookies = os.path.join(tempfile.gettempdir(), f'yt_cookies_{os.getpid()}.txt')
+                shutil.copy2(cookies_path, temp_cookies)
+                ydl_opts_info['cookiefile'] = temp_cookies
                 logger.info(f"[{self.platform}] Using cookies for download")
             
             with yt_dlp.YoutubeDL(ydl_opts_info) as ydl:
