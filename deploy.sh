@@ -147,6 +147,12 @@ setup_python_env() {
 configure_redis() {
     log_info "Configuring Redis for low memory..."
     
+    # Backup original config if exists
+    if [ -f /etc/redis.conf ]; then
+        cp /etc/redis.conf /etc/redis.conf.backup
+        log_info "Backed up original Redis config"
+    fi
+    
     # Optimize Redis for 1GB RAM
     cat > /etc/redis.conf <<EOF
 # Redis Configuration - Optimized for 1GB RAM
@@ -172,17 +178,40 @@ EOF
     
     # Create log directory
     mkdir -p /var/log/redis
-    chown redis:redis /var/log/redis
+    chown redis:redis /var/log/redis || true
     
     # Start Redis
     systemctl enable redis
     systemctl restart redis
     
-    log_info "Redis configured and started ✓"
+    # Test Redis connection
+    sleep 2
+    if redis-cli ping > /dev/null 2>&1; then
+        log_info "Redis configured and started ✓"
+    else
+        log_warn "Redis started but ping test failed, check manually"
+    fi
 }
 
 create_systemd_services() {
     log_info "Creating systemd services..."
+    
+    # Create .env file for environment variables
+    log_info "Creating environment configuration..."
+    cat > $APP_DIR/.env <<EOF
+# LibraryDown Environment Configuration
+REDIS_HOST=localhost
+REDIS_PORT=6379
+CELERY_BROKER_URL=redis://localhost:6379/0
+CELERY_RESULT_BACKEND=redis://localhost:6379/0
+MEDIA_FOLDER=media
+FILE_TTL=3600
+MAX_RETRIES=3
+RETRY_BACKOFF=5
+EOF
+    
+    chown $APP_USER:$APP_USER $APP_DIR/.env
+    chmod 600 $APP_DIR/.env
     
     # FastAPI Service
     cat > /etc/systemd/system/librarydown-api.service <<EOF
@@ -194,14 +223,19 @@ After=network.target redis.service
 Type=simple
 User=$APP_USER
 WorkingDirectory=$APP_DIR
+EnvironmentFile=$APP_DIR/.env
 Environment="PATH=$APP_DIR/venv/bin"
-ExecStart=$APP_DIR/venv/bin/uvicorn src.api.main:app --host 0.0.0.0 --port 8000 --workers 2
+ExecStart=$APP_DIR/venv/bin/uvicorn src.api.main:app --host 0.0.0.0 --port 8001 --workers 2
 Restart=always
 RestartSec=10
 
 # Resource limits (for 1GB RAM)
 MemoryLimit=300M
 CPUQuota=80%
+
+# Logging
+StandardOutput=journal
+StandardError=journal
 
 [Install]
 WantedBy=multi-user.target
@@ -217,6 +251,7 @@ After=network.target redis.service
 Type=simple
 User=$APP_USER
 WorkingDirectory=$APP_DIR
+EnvironmentFile=$APP_DIR/.env
 Environment="PATH=$APP_DIR/venv/bin"
 ExecStart=$APP_DIR/venv/bin/celery -A src.workers.celery_app worker --loglevel=info --concurrency=2
 Restart=always
@@ -225,6 +260,10 @@ RestartSec=10
 # Resource limits
 MemoryLimit=250M
 CPUQuota=80%
+
+# Logging
+StandardOutput=journal
+StandardError=journal
 
 [Install]
 WantedBy=multi-user.target
@@ -240,6 +279,7 @@ After=network.target redis.service
 Type=simple
 User=$APP_USER
 WorkingDirectory=$APP_DIR
+EnvironmentFile=$APP_DIR/.env
 Environment="PATH=$APP_DIR/venv/bin"
 ExecStart=$APP_DIR/venv/bin/celery -A src.workers.celery_app beat --loglevel=info
 Restart=always
@@ -247,6 +287,10 @@ RestartSec=10
 
 # Resource limits
 MemoryLimit=100M
+
+# Logging
+StandardOutput=journal
+StandardError=journal
 
 [Install]
 WantedBy=multi-user.target
@@ -261,11 +305,20 @@ EOF
 configure_nginx() {
     log_info "Configuring Nginx..."
     
+    # Check if port 8000 is already in use (API Checker running)
+    if netstat -tulpn | grep -q ":8000 "; then
+        log_warn "Port 8000 is already in use (probably API Checker)"
+        log_info "LibraryDown will use port 8001"
+        log_warn "Skipping Nginx auto-config - please configure manually"
+        log_warn "See DEPLOY_SAME_VPS.md for dual API setup instructions"
+        return 0
+    fi
+    
     cat > /etc/nginx/conf.d/librarydown.conf <<EOF
 # LibraryDown Nginx Configuration
 
 upstream librarydown_backend {
-    server 127.0.0.1:8000;
+    server 127.0.0.1:8001;
 }
 
 server {
@@ -305,13 +358,14 @@ server {
 EOF
     
     # Test Nginx config
-    nginx -t
-    
-    # Enable and start Nginx
-    systemctl enable nginx
-    systemctl restart nginx
-    
-    log_info "Nginx configured and started ✓"
+    if nginx -t 2>&1 | grep -q "test is successful"; then
+        systemctl enable nginx
+        systemctl restart nginx
+        log_info "Nginx configured and started ✓"
+    else
+        log_warn "Nginx config test failed, skipping restart"
+        log_warn "Please check Nginx configuration manually"
+    fi
 }
 
 configure_firewall() {
@@ -361,19 +415,36 @@ show_status() {
     echo ""
     log_info "Application deployed to: $APP_DIR"
     log_info "Services running:"
-    echo "  - librarydown-api (FastAPI)"
+    echo "  - librarydown-api (FastAPI on port 8001)"
     echo "  - librarydown-worker (Celery Worker)"
     echo "  - librarydown-beat (Celery Beat)"
     echo ""
-    log_info "Access your application:"
-    echo "  - API: http://YOUR_SERVER_IP/"
-    echo "  - Docs: http://YOUR_SERVER_IP/docs"
-    echo "  - Health: http://YOUR_SERVER_IP/health"
-    echo ""
+    
+    # Check if port 8000 is in use
+    if netstat -tulpn 2>/dev/null | grep -q ":8000 "; then
+        log_warn "IMPORTANT: Port 8000 is already in use (probably API Checker)"
+        log_info "LibraryDown is running on port 8001"
+        echo ""
+        log_warn "To access both APIs, configure Nginx routing:"
+        echo "  See: $APP_DIR/../librarydown/DEPLOY_SAME_VPS.md"
+        echo ""
+        log_info "Quick access (direct port):"
+        echo "  - LibraryDown API: http://YOUR_SERVER_IP:8001/"
+        echo "  - LibraryDown Docs: http://YOUR_SERVER_IP:8001/docs"
+        echo ""
+    else
+        log_info "Access your application:"
+        echo "  - API: http://YOUR_SERVER_IP/"
+        echo "  - Docs: http://YOUR_SERVER_IP/docs"
+        echo "  - Health: http://YOUR_SERVER_IP/health"
+        echo ""
+    fi
+    
     log_info "Useful commands:"
     echo "  - Check status: systemctl status librarydown-api"
     echo "  - View logs: journalctl -u librarydown-api -f"
     echo "  - Restart: systemctl restart librarydown-api"
+    echo "  - Test API: curl http://localhost:8001/"
     echo ""
     log_info "Memory usage:"
     free -h
