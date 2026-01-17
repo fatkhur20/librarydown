@@ -35,8 +35,9 @@ class InstagramDownloader(BaseDownloader):
             if os.path.exists(cookies_path):
                 import shutil
                 import tempfile
-                temp_cookies = os.path.join(tempfile.gettempdir(), f'ig_cookies_{os.getpid()}.txt')
+                temp_cookies = os.path.join(tempfile.gettempdir(), 'ig_cookies_librarydown.txt')
                 shutil.copy2(cookies_path, temp_cookies)
+                os.chmod(temp_cookies, 0o644)
                 ydl_opts['cookiefile'] = temp_cookies
                 logger.info(f"[{self.platform}] Using cookies from: {cookies_path}")
             
@@ -124,8 +125,9 @@ class InstagramDownloader(BaseDownloader):
             if os.path.exists(cookies_path):
                 import shutil
                 import tempfile
-                temp_cookies = os.path.join(tempfile.gettempdir(), f'ig_cookies_{os.getpid()}.txt')
+                temp_cookies = os.path.join(tempfile.gettempdir(), 'ig_cookies_librarydown.txt')
                 shutil.copy2(cookies_path, temp_cookies)
+                os.chmod(temp_cookies, 0o644)
                 ydl_opts_info['cookiefile'] = temp_cookies
                 logger.info(f"[{self.platform}] Using cookies for download")
             
