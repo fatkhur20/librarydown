@@ -156,3 +156,4 @@ dump.rdb
 # Celery
 celerybeat-schedule
 celerybeat.pid
+kontol
