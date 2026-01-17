@@ -30,6 +30,12 @@ class YouTubeDownloader(BaseDownloader):
                 'skip_download': True,
             }
             
+            # Add cookies file if exists
+            cookies_path = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), 'cookies', 'youtube_cookies.txt')
+            if os.path.exists(cookies_path):
+                ydl_opts['cookiefile'] = cookies_path
+                logger.info(f"[{self.platform}] Using cookies from: {cookies_path}")
+            
             with yt_dlp.YoutubeDL(ydl_opts) as ydl:
                 info = ydl.extract_info(url, download=False)
                 
@@ -153,6 +159,12 @@ class YouTubeDownloader(BaseDownloader):
                 'skip_download': True,
             }
             
+            # Add cookies file if exists
+            cookies_path = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), 'cookies', 'youtube_cookies.txt')
+            if os.path.exists(cookies_path):
+                ydl_opts_info['cookiefile'] = cookies_path
+                logger.info(f"[{self.platform}] Using cookies for download")
+            
             with yt_dlp.YoutubeDL(ydl_opts_info) as ydl:
                 logger.info(f"[{self.platform}] Extracting video information...")
                 info = ydl.extract_info(url, download=False)
@@ -216,6 +228,11 @@ class YouTubeDownloader(BaseDownloader):
             downloaded_files = []
             for download_info in downloads:
                 logger.info(f"[{self.platform}] Downloading {download_info['type']}...")
+                
+                # Add cookies to download options
+                if os.path.exists(cookies_path):
+                    download_info['opts']['cookiefile'] = cookies_path
+                
                 with yt_dlp.YoutubeDL(download_info['opts']) as ydl:
                     ydl.download([url])
                 downloaded_files.append(download_info['type'])
