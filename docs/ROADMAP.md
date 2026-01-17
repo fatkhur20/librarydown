@@ -29,8 +29,8 @@ Menjadikan **LibraryDown** sebagai solusi universal downloader yang reliable, ce
 - API versioning
 
 **Platform Support:**
-- ✅ TikTok (Fully working with quality selection & audio)
-- ✅ YouTube (Fully working with quality selection & audio)
+- ✅ TikTok (Fully working with quality selection & audio) - **PRODUCTION READY**
+- ✅ YouTube (Fully working with quality selection & audio, cookie authentication, ffmpeg integration) - **PRODUCTION READY**
 - ✅ Instagram (Fully working with quality selection & audio)
 - ⚠️ Twitter/X (Placeholder - environment limitations)
 
@@ -253,8 +253,8 @@ Menjadikan **LibraryDown** sebagai solusi universal downloader yang reliable, ce
 
 | Platform | Priority | Complexity | Status | Target Version |
 |----------|----------|------------|--------|----------------|
-| TikTok | 🔥 High | Medium | ✅ Done | v2.0.0 |
-| YouTube | 🔥 High | Medium | ✅ Done | v2.0.0 |
+| TikTok | 🔥 High | Medium | ✅ **Production** | v2.0.0 |
+| YouTube | 🔥 High | Medium | ✅ **Production** | v2.0.0 |
 | Instagram | 🔥 High | High | ✅ Done | v2.0.0 |
 | Twitter/X | 🔥 High | High | ⚠️ Blocked | v3.1+ |
 | Reddit | 🔥 High | Low | ⚠️ Blocked | v3.1+ |
@@ -274,13 +274,18 @@ Menjadikan **LibraryDown** sebagai solusi universal downloader yang reliable, ce
 ### Current Limitations
 
 **TikTok:**
+- ✅ **PRODUCTION READY** - Fully working with watermark/no-watermark support
+- ✅ Multi-quality video & audio extraction
 - ⚠️ Some private/deleted videos tidak bisa di-download
 - ⚠️ Age-restricted content might require authentication
 
 **YouTube:**
+- ✅ **PRODUCTION READY** - Fully working with cookie authentication
+- ✅ ffmpeg integration for video+audio merging
+- ✅ Multi-quality support (144p - 4K)
+- ✅ Cookie-based authentication for bot detection bypass
 - ⚠️ Premium/Members-only content tidak support
 - ⚠️ Live streams belum support
-- ⚠️ Some videos require authentication
 
 **Instagram:**
 - ✅ Fully working dengan yt-dlp integration
@@ -376,7 +381,7 @@ Roadmap ini bersifat **flexible** dan dapat berubah berdasarkan:
 - Community contributions
 - Resource availability
 
-**Last Updated**: January 16, 2026
+**Last Updated**: January 17, 2026
 
 ---
 
