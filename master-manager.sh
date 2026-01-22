@@ -165,30 +165,43 @@ start_services_manual() {
     # Start Redis if available
     if command -v redis-server >/dev/null 2>&1; then
         echo "Starting Redis (if not running)..."
-        pgrep -f redis-server > /dev/null || redis-server > /dev/null 2>&1 &
+        if ! pgrep -f redis-server > /dev/null; then
+            redis-server > /dev/null 2>&1 &
+            sleep 1
+        fi
     fi
     
     # Start API Checker if directory exists
     if [ -d "/root/apichecker" ]; then
-        echo "Starting API Checker (port 8000) in background..."
-        cd /root/apichecker
-        if [ -d "venv" ]; then
-            source venv/bin/activate
+        # Check for port conflict before starting
+        if check_port_conflicts 8000 "API Checker"; then
+            echo "Starting API Checker (port 8000) in background..."
+            cd /root/apichecker
+            if [ -d "venv" ]; then
+                source venv/bin/activate
+            fi
+            pkill -f "uvicorn.*8000" 2>/dev/null || true
+            nohup uvicorn src.main:app --host 0.0.0.0 --port 8000 --workers 1 > /root/apichecker/api_checker.log 2>&1 &
+        else
+            echo "[SKIPPED] API Checker due to port conflict"
         fi
-        pkill -f "uvicorn.*8000" 2>/dev/null || true
-        nohup uvicorn src.main:app --host 0.0.0.0 --port 8000 --workers 1 > /root/apichecker/api_checker.log 2>&1 &
     else
         echo "[INFO] API Checker directory not found, skipping..."
     fi
     
     # Start LibraryDown API
-    echo "Starting LibraryDown API (port 8001) in background..."
-    cd /root/librarydown
-    if [ -d "venv" ]; then
-        source venv/bin/activate
+    # Check for port conflict before starting
+    if check_port_conflicts 8001 "LibraryDown API"; then
+        echo "Starting LibraryDown API (port 8001) in background..."
+        cd /root/librarydown
+        if [ -d "venv" ]; then
+            source venv/bin/activate
+        fi
+        pkill -f "uvicorn.*8001" 2>/dev/null || true
+        nohup uvicorn src.api.main:app --host 0.0.0.0 --port 8001 --workers 1 > /root/librarydown/api_server.log 2>&1 &
+    else
+        echo "[SKIPPED] LibraryDown API due to port conflict"
     fi
-    pkill -f "uvicorn.*8001" 2>/dev/null || true
-    nohup uvicorn src.api.main:app --host 0.0.0.0 --port 8001 --workers 1 > /root/librarydown/api_server.log 2>&1 &
     
     # Start LibraryDown Worker
     echo "Starting LibraryDown Worker in background..."
@@ -210,7 +223,7 @@ start_services_manual() {
     
     sleep 3
     
-    echo "[SUCCESS] All services started in manual mode!"
+    echo "[SUCCESS] Services started in manual mode (conflict-checked)!"
 }
 
 # Stop services
@@ -238,49 +251,96 @@ stop_services() {
     echo "[SUCCESS] All services stopped"
 }
 
+# Check if service is running and return status
+check_service_status() {
+    local service_name=$1
+    local port=$2
+    local process_pattern=$3
+    
+    if command -v systemctl >/dev/null 2>&1; then
+        # Systemd environment
+        if [ -f "/etc/systemd/system/${service_name}.service" ]; then
+            if sudo systemctl is-active --quiet "$service_name"; then
+                echo "  ✓ Running"
+                return 0
+            else
+                echo "  ✗ Stopped"
+                return 1
+            fi
+        else
+            echo "  ⚠️  Not installed"
+            return 2
+        fi
+    else
+        # Termux environment - check for processes on port or process pattern
+        if [ -n "$port" ]; then
+            # Check if port is in use by a process
+            if ss -tulnp 2>/dev/null | grep -q ":$port " || pgrep -f "$process_pattern" > /dev/null; then
+                echo "  ✓ Running"
+                return 0
+            else
+                echo "  ✗ Stopped"
+                return 1
+            fi
+        else
+            # Check process pattern only
+            if pgrep -f "$process_pattern" > /dev/null; then
+                echo "  ✓ Running"
+                return 0
+            else
+                echo "  ✗ Stopped"
+                return 1
+            fi
+        fi
+    fi
+}
+
+# Check for port conflicts before starting services
+check_port_conflicts() {
+    local port=$1
+    local service_name=$2
+    
+    if command -v ss >/dev/null 2>&1; then
+        if ss -tulnp 2>/dev/null | grep -q ":$port "; then
+            echo "[CONFLICT] Port $port already in use by another process for $service_name"
+            ss -tulnp 2>/dev/null | grep ":$port "
+            return 1
+        fi
+    elif command -v netstat >/dev/null 2>&1; then
+        if netstat -tulnp 2>/dev/null | grep -q ":$port "; then
+            echo "[CONFLICT] Port $port already in use by another process for $service_name"
+            netstat -tulnp 2>/dev/null | grep ":$port "
+            return 1
+        fi
+    fi
+    return 0
+}
+
 # Show service status
 show_status() {
     echo "=== Service Status ==="
     echo ""
     
-    # Check if systemd is available
-    if command -v systemctl >/dev/null 2>&1; then
-        # Check if apichecker service exists
-        if [ -f "/etc/systemd/system/apichecker-api.service" ]; then
-            echo "[API Checker (port 8000)]:"
-            sudo systemctl is-active apichecker-api && echo "  ✓ Running" || echo "  ✗ Stopped"
-        else
-            echo "[API Checker (port 8000)]:"
-            echo "  ⚠️  Not installed"
-        fi
-        
-        echo "[LibraryDown API (port 8001)]:"
-        sudo systemctl is-active librarydown-api && echo "  ✓ Running" || echo "  ✗ Stopped"
-        
-        echo "[LibraryDown Worker]:"
-        sudo systemctl is-active librarydown-worker && echo "  ✓ Running" || echo "  ✗ Stopped"
-        
-        echo "[LibraryDown Bot]:"
-        sudo systemctl is-active librarydown-bot && echo "  ✓ Running" || echo "  ✗ Stopped"
+    # Check API Checker status
+    if [ -d "/root/apichecker" ]; then
+        echo "[API Checker (port 8000)]:"
+        check_service_status "apichecker-api" "8000" "uvicorn.*8000"
     else
-        # Termux environment - check processes
-        if [ -d "/root/apichecker" ]; then
-            echo "[API Checker (port 8000)]:"
-            pgrep -f "uvicorn.*8000" && echo "  ✓ Running" || echo "  ✗ Stopped"
-        else
-            echo "[API Checker (port 8000)]:"
-            echo "  ⚠️  Not installed"
-        fi
-        
-        echo "[LibraryDown API (port 8001)]:"
-        pgrep -f "uvicorn.*8001" && echo "  ✓ Running" || echo "  ✗ Stopped"
-        
-        echo "[LibraryDown Worker]:"
-        pgrep -f "celery.*worker" && echo "  ✓ Running" || echo "  ✗ Stopped"
-        
-        echo "[LibraryDown Bot]:"
-        pgrep -f "bot_monitor.sh\|bot_cookie_manager" && echo "  ✓ Running" || echo "  ✗ Stopped"
+        echo "[API Checker (port 8000)]:"
+        echo "  ⚠️  Directory not found"
     fi
+    
+    # Check LibraryDown API status
+    echo "[LibraryDown API (port 8001)]:"
+    check_service_status "librarydown-api" "8001" "uvicorn.*8001"
+    
+    # Check LibraryDown Worker status
+    echo "[LibraryDown Worker]:"
+    check_service_status "librarydown-worker" "" "celery.*worker"
+    
+    # Check LibraryDown Bot status
+    echo "[LibraryDown Bot]:"
+    check_service_status "librarydown-bot" "" "bot_cookie_manager\|bot_monitor.sh"
     
     echo ""
     echo "=== Resource Usage ==="
