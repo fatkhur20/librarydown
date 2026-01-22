@@ -7,6 +7,7 @@ set -e
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 LIBRARYDOWN_DIR="/root/librarydown"
 APICHECKER_DIR="/root/apichecker"
+APICHECKER_SERVICE_ENABLED=false
 
 show_header() {
     echo "=========================================="
@@ -90,17 +91,34 @@ create_dirs() {
 install_services() {
     echo "[INSTALLING] Systemd services..."
     
-    # Copy service files to systemd directory
+    # Copy LibraryDown service files to systemd directory
     sudo cp "$LIBRARYDOWN_DIR/librarydown-api.service" /etc/systemd/system/
     sudo cp "$LIBRARYDOWN_DIR/librarydown-worker.service" /etc/systemd/system/
     sudo cp "$LIBRARYDOWN_DIR/librarydown-bot.service" /etc/systemd/system/
-    sudo cp "$APICHECKER_DIR/apichecker-optimize.service" /etc/systemd/system/apichecker-api.service
+    
+    # Copy API Checker service if the directory exists
+    if [ -d "$APICHECKER_DIR" ]; then
+        if [ -f "$APICHECKER_DIR/apichecker-optimize.service" ]; then
+            sudo cp "$APICHECKER_DIR/apichecker-optimize.service" /etc/systemd/system/apichecker-api.service
+            APICHECKER_SERVICE_ENABLED=true
+        else
+            echo "[WARNING] API Checker service file not found, skipping..."
+            APICHECKER_SERVICE_ENABLED=false
+        fi
+    else
+        echo "[WARNING] API Checker directory not found, skipping..."
+        APICHECKER_SERVICE_ENABLED=false
+    fi
     
     # Reload systemd
     sudo systemctl daemon-reload
     
-    # Enable services
-    sudo systemctl enable librarydown-api librarydown-worker librarydown-bot apichecker-api
+    # Enable services based on what's available
+    if [ "$APICHECKER_SERVICE_ENABLED" = true ]; then
+        sudo systemctl enable librarydown-api librarydown-worker librarydown-bot apichecker-api
+    else
+        sudo systemctl enable librarydown-api librarydown-worker librarydown-bot
+    fi
     
     echo "[SUCCESS] Services installed and enabled"
 }
@@ -115,8 +133,13 @@ start_services() {
         echo "Starting Redis..."
         sudo systemctl start redis-server
         
-        echo "Starting API Checker (port 8000)..."
-        sudo systemctl start apichecker-api
+        # Start API Checker if available
+        if [ -f "/etc/systemd/system/apichecker-api.service" ]; then
+            echo "Starting API Checker (port 8000)..."
+            sudo systemctl start apichecker-api
+        else
+            echo "[INFO] API Checker not installed, skipping..."
+        fi
         
         echo "Starting LibraryDown API (port 8001)..."
         sudo systemctl start librarydown-api
@@ -145,14 +168,18 @@ start_services_manual() {
         pgrep -f redis-server > /dev/null || redis-server > /dev/null 2>&1 &
     fi
     
-    # Start API Checker
-    echo "Starting API Checker (port 8000) in background..."
-    cd /root/apichecker
-    if [ -d "venv" ]; then
-        source venv/bin/activate
+    # Start API Checker if directory exists
+    if [ -d "/root/apichecker" ]; then
+        echo "Starting API Checker (port 8000) in background..."
+        cd /root/apichecker
+        if [ -d "venv" ]; then
+            source venv/bin/activate
+        fi
+        pkill -f "uvicorn.*8000" 2>/dev/null || true
+        nohup uvicorn src.main:app --host 0.0.0.0 --port 8000 --workers 1 > /root/apichecker/api_checker.log 2>&1 &
+    else
+        echo "[INFO] API Checker directory not found, skipping..."
     fi
-    pkill -f "uvicorn.*8000" 2>/dev/null || true
-    nohup uvicorn src.main:app --host 0.0.0.0 --port 8000 --workers 1 > /root/apichecker/api_checker.log 2>&1 &
     
     # Start LibraryDown API
     echo "Starting LibraryDown API (port 8001) in background..."
@@ -193,7 +220,11 @@ stop_services() {
     # Check if systemd is available
     if command -v systemctl >/dev/null 2>&1; then
         # Systemd environment
-        sudo systemctl stop librarydown-bot librarydown-worker librarydown-api apichecker-api
+        if [ -f "/etc/systemd/system/apichecker-api.service" ]; then
+            sudo systemctl stop librarydown-bot librarydown-worker librarydown-api apichecker-api
+        else
+            sudo systemctl stop librarydown-bot librarydown-worker librarydown-api
+        fi
     else
         # Termux environment - kill processes
         echo "[TERMUX] Stopping services manually..."
@@ -214,8 +245,14 @@ show_status() {
     
     # Check if systemd is available
     if command -v systemctl >/dev/null 2>&1; then
-        echo "[API Checker (port 8000)]:"
-        sudo systemctl is-active apichecker-api && echo "  ✓ Running" || echo "  ✗ Stopped"
+        # Check if apichecker service exists
+        if [ -f "/etc/systemd/system/apichecker-api.service" ]; then
+            echo "[API Checker (port 8000)]:"
+            sudo systemctl is-active apichecker-api && echo "  ✓ Running" || echo "  ✗ Stopped"
+        else
+            echo "[API Checker (port 8000)]:"
+            echo "  ⚠️  Not installed"
+        fi
         
         echo "[LibraryDown API (port 8001)]:"
         sudo systemctl is-active librarydown-api && echo "  ✓ Running" || echo "  ✗ Stopped"
@@ -227,8 +264,13 @@ show_status() {
         sudo systemctl is-active librarydown-bot && echo "  ✓ Running" || echo "  ✗ Stopped"
     else
         # Termux environment - check processes
-        echo "[API Checker (port 8000)]:"
-        pgrep -f "uvicorn.*8000" && echo "  ✓ Running" || echo "  ✗ Stopped"
+        if [ -d "/root/apichecker" ]; then
+            echo "[API Checker (port 8000)]:"
+            pgrep -f "uvicorn.*8000" && echo "  ✓ Running" || echo "  ✗ Stopped"
+        else
+            echo "[API Checker (port 8000)]:"
+            echo "  ⚠️  Not installed"
+        fi
         
         echo "[LibraryDown API (port 8001)]:"
         pgrep -f "uvicorn.*8001" && echo "  ✓ Running" || echo "  ✗ Stopped"
