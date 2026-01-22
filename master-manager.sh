@@ -52,10 +52,23 @@ show_usage() {
 install_deps() {
     echo "[INSTALLING] Dependencies..."
     
+    cd "$LIBRARYDOWN_DIR"
+    
+    # Check if virtual environment exists, create if not
+    if [ ! -d "venv" ]; then
+        echo "[INFO] Creating virtual environment..."
+        python3 -m venv venv
+    fi
+    
+    # Activate virtual environment
+    source venv/bin/activate
+    
+    # Install/update requirements
+    pip3 install --upgrade pip
+    pip3 install -r requirements.txt
+    
     # Install telegram python library if not present
     if ! python3 -c "import telegram" >/dev/null 2>&1; then
-        cd "$LIBRARYDOWN_DIR"
-        source venv/bin/activate
         pip3 install python-telegram-bot
     fi
     
@@ -331,6 +344,11 @@ case "$1" in
         show_header
         install_deps
         create_dirs
+        # Create .env file if it doesn't exist
+        if [ ! -f ".env" ]; then
+            cp .env.example .env
+            echo "[INFO] Created .env file from example"
+        fi
         install_services
         configure_bot
         start_services
@@ -342,6 +360,11 @@ case "$1" in
     install)
         show_header
         install_deps
+        # Create .env file if it doesn't exist
+        if [ ! -f ".env" ]; then
+            cp .env.example .env
+            echo "[INFO] Created .env file from example"
+        fi
         ;;
     services)
         show_header
