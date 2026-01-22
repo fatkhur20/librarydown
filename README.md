@@ -92,16 +92,48 @@ cd librarydown
 2. **Run setup script**
 
 ```bash
+# Traditional setup
 chmod +x setup.sh
 ./setup.sh
+
+# Or use the new comprehensive management system
+chmod +x master-manager.sh
+./master-manager.sh setup
 ```
 
-Script akan otomatis:
-- Membuat virtual environment
+The traditional setup script will automatically:
+- Create virtual environment
 - Install dependencies
-- Setup Redis (jika belum ada)
-- Copy .env.example ke .env
+- Setup Redis (if not available)
+- Copy .env.example to .env
 - Create media folder
+
+The new management system provides additional features:
+- Auto-configure Telegram bot for cookie management
+- Start all services with monitoring
+- Environment auto-detection (systemd vs Termux)
+- Comprehensive service management
+
+### Management System
+
+LibraryDown now includes a comprehensive management system:
+
+```bash
+# Master management suite
+./master-manager.sh [command]
+
+# Quick shortcuts
+./setup.sh      # Full installation
+./update.sh     # Update and restart
+./restart.sh    # Restart services
+
+# Examples:
+./master-manager.sh start      # Start all services
+./master-manager.sh status     # Check service status
+./master-manager.sh bot-config # Configure Telegram bot
+./master-manager.sh monitor    # Monitor services
+./master-manager.sh backup     # Backup configuration
+```
 
 3. **Activate virtual environment**
 
