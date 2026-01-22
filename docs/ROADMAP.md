@@ -29,10 +29,19 @@ Menjadikan **LibraryDown** sebagai solusi universal downloader yang reliable, ce
 - API versioning
 
 **Platform Support:**
-- ✅ TikTok (Fully working with quality selection & audio) - **PRODUCTION READY**
-- ✅ YouTube (Fully working with quality selection & audio, cookie authentication, ffmpeg integration) - **PRODUCTION READY**
-- ✅ Instagram (Fully working with quality selection & audio)
+- ✅ **TikTok** - Fully working with quality selection & audio - **PRODUCTION READY** ✅
+- ✅ **YouTube** - Cookie authentication, ffmpeg integration, multi-quality support - **PRODUCTION READY** ✅
+- ✅ **Instagram** - Cookie authentication, persistent cookies, video+audio bundling - **PRODUCTION READY** ✅
 - ⚠️ Twitter/X (Placeholder - environment limitations)
+
+**Production Deployment:**
+- ✅ Alibaba Cloud VPS (1GB RAM)
+- ✅ Domain-based routing (apdl.vortex-xx.biz.id)
+- ✅ Systemd services (API + Worker)
+- ✅ Redis configuration optimized
+- ✅ ffmpeg integration for video merging
+- ✅ Cookie-based authentication system
+- ✅ Automated deployment scripts
 
 ---
 
@@ -255,7 +264,7 @@ Menjadikan **LibraryDown** sebagai solusi universal downloader yang reliable, ce
 |----------|----------|------------|--------|----------------|
 | TikTok | 🔥 High | Medium | ✅ **Production** | v2.0.0 |
 | YouTube | 🔥 High | Medium | ✅ **Production** | v2.0.0 |
-| Instagram | 🔥 High | High | ✅ Done | v2.0.0 |
+| Instagram | 🔥 High | High | ✅ **Production** | v2.0.0 |
 | Twitter/X | 🔥 High | High | ⚠️ Blocked | v3.1+ |
 | Reddit | 🔥 High | Low | ⚠️ Blocked | v3.1+ |
 | Facebook | 🟡 Medium | High | 📋 Planned | v2.2.0 |

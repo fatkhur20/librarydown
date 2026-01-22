@@ -5,7 +5,7 @@ class Settings(BaseSettings):
     VERSION: str = "2.0.0"
     DEBUG: bool = True
     API_V1_STR: str = "/api/v1"
-    API_BASE_URL: str = "http://localhost:8000"
+    API_BASE_URL: str = "http://localhost:8001"  # Different port to avoid conflict with apichecker
 
     # Security
     ALLOWED_ORIGINS: list = ["*"]  # CORS origins

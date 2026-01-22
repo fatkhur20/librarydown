@@ -1,0 +1,34 @@
+[Unit]
+Description=LibraryDown Celery Worker
+After=librarydown-api.service redis.service
+
+[Service]
+Type=simple
+User=root
+WorkingDirectory=/root/librarydown
+Environment="PATH=/root/librarydown/venv/bin:/usr/local/bin:/usr/bin:/bin"
+EnvironmentFile=/root/librarydown/.env
+
+# Start single Celery worker (memory constrained)
+ExecStart=/root/librarydown/venv/bin/celery -A src.workers.celery_app worker --loglevel=info --concurrency=1 --max-tasks-per-child=10
+
+# Resource limits for Termux environment
+MemoryLimit=150M
+CPUQuota=30%
+TasksMax=30
+
+# Process limits
+LimitNOFILE=512
+LimitNPROC=16
+
+# Restart policy
+Restart=always
+RestartSec=5
+
+# Logging
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=librarydown-worker
+
+[Install]
+WantedBy=multi-user.target

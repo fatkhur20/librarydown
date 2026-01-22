@@ -1,0 +1,34 @@
+[Unit]
+Description=LibraryDown Telegram Cookie Manager Bot
+After=network.target librarydown-api.service librarydown-worker.service
+
+[Service]
+Type=simple
+User=root
+WorkingDirectory=/root/librarydown
+Environment="PATH=/root/librarydown/venv/bin:/usr/local/bin:/usr/bin:/bin"
+EnvironmentFile=/root/librarydown/.env
+
+# Start Telegram bot
+ExecStart=/root/librarydown/venv/bin/python3 -m src.bot_cookie_manager
+
+# Resource limits for bot (minimal resource usage)
+MemoryLimit=50M
+CPUQuota=10%
+TasksMax=10
+
+# Process limits
+LimitNOFILE=256
+LimitNPROC=8
+
+# Restart policy
+Restart=always
+RestartSec=10
+
+# Logging
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=librarydown-bot
+
+[Install]
+WantedBy=multi-user.target
