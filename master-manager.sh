@@ -96,7 +96,7 @@ install_services() {
     sudo cp "$LIBRARYDOWN_DIR/librarydown-worker.service" /etc/systemd/system/
     sudo cp "$LIBRARYDOWN_DIR/librarydown-bot.service" /etc/systemd/system/
     
-    # Copy API Checker service if the directory exists
+    # Copy API Checker service if the directory and file exist
     if [ -d "$APICHECKER_DIR" ]; then
         if [ -f "$APICHECKER_DIR/apichecker-optimize.service" ]; then
             sudo cp "$APICHECKER_DIR/apichecker-optimize.service" /etc/systemd/system/apichecker-api.service
