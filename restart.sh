@@ -2,4 +2,4 @@
 # LibraryDown Restart Script
 # Restart all services
 
-/root/master-manager.sh restart
+./master-manager.sh restart

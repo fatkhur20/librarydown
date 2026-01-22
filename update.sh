@@ -2,5 +2,5 @@
 # LibraryDown Update Script
 # Update system and restart services
 
-/root/master-manager.sh update
-/root/master-manager.sh restart
+./master-manager.sh update
+./master-manager.sh restart
