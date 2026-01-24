@@ -22,6 +22,7 @@ class MonitoringSettings(BaseSettings):
     
     class Config:
         env_file = ".env"
+        extra = "ignore"  # Ignore extra fields from .env
 
 
 # Global monitoring settings instance
