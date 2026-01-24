@@ -173,60 +173,23 @@ def download_media_task(self, url: str, quality: str = "720p"):
         # Content not available or unsupported platform
         error_msg = str(e)
         logger.error(f"[Task {task_id}] ValueError: {error_msg}")
-        self.update_state(
-            state='FAILURE',
-            meta={
-                'status': 'FAILURE',
-                'error': error_msg,
-                'error_type': 'ValueError',
-                'platform': platform
-            }
-        )
         raise
         
     except NotImplementedError as e:
-        # Platform not fully implemented (Instagram, Twitter)
+        # Platform not fully implemented
         error_msg = str(e)
         logger.warning(f"[Task {task_id}] NotImplementedError: {error_msg}")
-        self.update_state(
-            state='FAILURE',
-            meta={
-                'status': 'FAILURE',
-                'error': error_msg,
-                'error_type': 'NotImplementedError',
-                'platform': platform
-            }
-        )
         raise
         
     except RequestError as e:
         # Network error - will auto-retry
         error_msg = f"Network error: {str(e)}"
         logger.error(f"[Task {task_id}] RequestError (attempt {self.request.retries + 1}/{settings.MAX_RETRIES}): {error_msg}")
-        self.update_state(
-            state='RETRY',
-            meta={
-                'status': 'RETRY',
-                'error': error_msg,
-                'error_type': 'RequestError',
-                'platform': platform,
-                'retry_count': self.request.retries
-            }
-        )
         raise
         
     except Exception as e:
         # Unexpected error
         error_msg = f"Unexpected error: {str(e)}"
         logger.exception(f"[Task {task_id}] Unexpected exception: {error_msg}")
-        self.update_state(
-            state='FAILURE',
-            meta={
-                'status': 'FAILURE',
-                'error': error_msg,
-                'error_type': type(e).__name__,
-                'platform': platform
-            }
-        )
         raise
 
