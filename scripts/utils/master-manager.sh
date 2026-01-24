@@ -103,6 +103,19 @@ create_dirs() {
 install_services() {
     echo "[INSTALLING] Systemd services..."
     
+    # Check if service files exist
+    if [ ! -f "$LIBRARYDOWN_DIR/librarydown-api.service" ]; then
+        echo "[INFO] Systemd service files not found, will use manual mode instead"
+        echo "[INFO] Services will be started using nohup in background"
+        return 0
+    fi
+    
+    # Check if systemd is available
+    if ! command -v systemctl >/dev/null 2>&1; then
+        echo "[INFO] Systemd not available, will use manual mode instead"
+        return 0
+    fi
+    
     # Copy LibraryDown service files to systemd directory
     sudo cp "$LIBRARYDOWN_DIR/librarydown-api.service" /etc/systemd/system/
     sudo cp "$LIBRARYDOWN_DIR/librarydown-worker.service" /etc/systemd/system/
