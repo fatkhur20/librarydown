@@ -12,11 +12,12 @@ class ProxyConfig:
     PROXY_PORT = 9050  # Default Tor port, change to 2080 for 3proxy
     PROXY_URL = f"{PROXY_TYPE}://{PROXY_HOST}:{PROXY_PORT}"
     
-    # Alternative proxy settings for 3proxy
+    # Alternative proxy settings
     PROXY_PORTS = {
-        'tor': 9050,      # Tor SOCKS5 port
-        '3proxy': 2080,   # 3proxy SOCKS5 port
-        'custom': None    # Set to specific port if using custom proxy
+        'tor': 9050,        # Tor SOCKS5 port
+        '3proxy': 2080,     # 3proxy SOCKS5 port
+        'tinyproxy': 8888,  # tinyproxy HTTP port
+        'custom': None      # Set to specific port if using custom proxy
     }
     
     # Proxy timeout settings

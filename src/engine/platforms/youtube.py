@@ -227,7 +227,10 @@ class YouTubeDownloader(BaseDownloader):
                                 'player_client': ['tv_embedded'],
                             }
                         },
-                        'proxy': ProxyConfig.PROXY_URL
+                        'proxy': ProxyConfig.PROXY_URL,
+                        'http_headers': {
+                            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
+                        }
                     }
                 })
             else:
@@ -259,7 +262,10 @@ class YouTubeDownloader(BaseDownloader):
                                 'player_client': ['tv_embedded'],
                             }
                         },
-                        'proxy': ProxyConfig.PROXY_URL
+                        'proxy': ProxyConfig.PROXY_URL,
+                        'http_headers': {
+                            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
+                        }
                     }
                 })
                 
@@ -277,7 +283,10 @@ class YouTubeDownloader(BaseDownloader):
                                 'player_client': ['tv_embedded'],
                             }
                         },
-                        'proxy': ProxyConfig.PROXY_URL
+                        'proxy': ProxyConfig.PROXY_URL,
+                        'http_headers': {
+                            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
+                        }
                     }
                 })
             

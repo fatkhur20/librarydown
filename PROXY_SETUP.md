@@ -16,6 +16,12 @@ Run the 3proxy setup script:
 sudo ./scripts/setup_3proxy.sh
 ```
 
+### Option 3: Tinyproxy (Simple HTTP proxy for Alibaba Cloud)
+For Alibaba Cloud Linux systems where other proxies don't work:
+```bash
+sudo ./scripts/setup_tinyproxy.sh
+```
+
 ## Manage Proxy Service
 
 Use the management script with proxy type specification:
@@ -34,6 +40,13 @@ Use the management script with proxy type specification:
 ./scripts/manage_proxy.sh restart 3proxy
 ./scripts/manage_proxy.sh stop 3proxy
 
+# For tinyproxy
+./scripts/manage_proxy.sh start tinyproxy
+./scripts/manage_proxy.sh status tinyproxy
+./scripts/manage_proxy.sh test tinyproxy
+./scripts/manage_proxy.sh restart tinyproxy
+./scripts/manage_proxy.sh stop tinyproxy
+
 # Default (tor) if no type specified
 ./scripts/manage_proxy.sh start
 ```
@@ -42,7 +55,8 @@ Use the management script with proxy type specification:
 
 The proxy settings are in `config/proxy_config.py`:
 - Default: Tor proxy at 127.0.0.1:9050
-- 3proxy: 127.0.0.1:2080
+- 3proxy: 127.0.0.1:2080 (SOCKS5)
+- Tinyproxy: 127.0.0.1:8888 (HTTP)
 - Enabled for: YouTube only
 - Disabled for: Instagram, TikTok, Twitter
 
@@ -53,7 +67,7 @@ PROXY_PORT = 2080  # Change from 9050 to 2080
 
 Or use the `set_proxy_type()` method:
 ```python
-ProxyConfig.set_proxy_type('3proxy')  # Options: 'tor', '3proxy'
+ProxyConfig.set_proxy_type('3proxy')    # Options: 'tor', '3proxy', 'tinyproxy'
 ```
 
 ## YouTube Downloads
@@ -91,6 +105,11 @@ If YouTube downloads still fail:
 2. Test proxy: `./scripts/manage_proxy.sh test 3proxy`
 3. Check proxy connectivity: `curl --socks5-hostname 127.0.0.1:2080 https://httpbin.org/ip`
 
-4. Restart proxy: `./scripts/manage_proxy.sh restart [tor|3proxy]`
+### For tinyproxy:
+1. Check if tinyproxy is running: `systemctl status tinyproxy`
+2. Test proxy: `./scripts/manage_proxy.sh test tinyproxy`
+3. Check proxy connectivity: `curl -x http://127.0.0.1:8888 https://httpbin.org/ip`
+
+4. Restart proxy: `./scripts/manage_proxy.sh restart [tor|3proxy|tinyproxy]`
 
 For best results, combine with valid YouTube cookies in `/opt/librarydown/cookies/`.

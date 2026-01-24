@@ -4,7 +4,7 @@
 # This script handles starting, stopping, and checking proxy status
 # Supports both Tor and 3proxy
 
-PROXY_TYPE=${2:-"tor"}  # Default to tor, can specify 3proxy as second argument
+PROXY_TYPE=${2:-"tor"}  # Default to tor, can specify 3proxy/tinyproxy as second argument
 
 # Determine proxy settings based on type
 if [ "$PROXY_TYPE" = "3proxy" ]; then
@@ -12,6 +12,11 @@ if [ "$PROXY_TYPE" = "3proxy" ]; then
     PROXY_PORT=2080
     PROXY_SERVICE="3proxy"
     PROXY_PID_FILE="/tmp/3proxy.pid"
+elif [ "$PROXY_TYPE" = "tinyproxy" ]; then
+    PROXY_NAME="tinyproxy"
+    PROXY_PORT=8888
+    PROXY_SERVICE="tinyproxy"
+    PROXY_PID_FILE=""
 else
     PROXY_NAME="Tor"
     PROXY_PORT=9050
@@ -39,6 +44,16 @@ case $ACTION in
                 echo "3proxy configuration not found. Run setup_3proxy.sh first."
                 exit 1
             fi
+        elif [ "$PROXY_TYPE" = "tinyproxy" ]; then
+            echo "Starting tinyproxy..."
+            systemctl start tinyproxy
+            if systemctl is-active --quiet tinyproxy; then
+                echo "tinyproxy started successfully"
+                echo "HTTP proxy available at: http://127.0.0.1:8888"
+            else
+                echo "Failed to start tinyproxy"
+                exit 1
+            fi
         else
             echo "Starting Tor proxy..."
             systemctl start tor
@@ -56,6 +71,10 @@ case $ACTION in
             echo "Stopping 3proxy..."
             pkill -f "3proxy" 2>/dev/null || true
             echo "3proxy stopped"
+        elif [ "$PROXY_TYPE" = "tinyproxy" ]; then
+            echo "Stopping tinyproxy..."
+            systemctl stop tinyproxy
+            echo "tinyproxy stopped"
         else
             echo "Stopping Tor proxy..."
             systemctl stop tor
@@ -79,6 +98,16 @@ case $ACTION in
                 fi
             else
                 echo "3proxy configuration not found. Run setup_3proxy.sh first."
+                exit 1
+            fi
+        elif [ "$PROXY_TYPE" = "tinyproxy" ]; then
+            echo "Restarting tinyproxy..."
+            systemctl restart tinyproxy
+            if systemctl is-active --quiet tinyproxy; then
+                echo "tinyproxy restarted successfully"
+                echo "HTTP proxy available at: http://127.0.0.1:8888"
+            else
+                echo "Failed to restart tinyproxy"
                 exit 1
             fi
         else
@@ -108,6 +137,21 @@ case $ACTION in
                 fi
             else
                 echo "3proxy: STOPPED"
+            fi
+        elif [ "$PROXY_TYPE" = "tinyproxy" ]; then
+            if systemctl is-active --quiet tinyproxy; then
+                echo "tinyproxy: RUNNING"
+                echo "HTTP proxy available at: http://127.0.0.1:8888"
+                
+                # Test connectivity through tinyproxy
+                echo "Testing tinyproxy connectivity..."
+                if timeout 10 curl -x http://127.0.0.1:8888 -s https://httpbin.org/ip | grep -q "origin" 2>/dev/null; then
+                    echo "tinyproxy connectivity: WORKING"
+                else
+                    echo "tinyproxy connectivity: FAILED"
+                fi
+            else
+                echo "tinyproxy: STOPPED"
             fi
         else
             if systemctl is-active --quiet tor; then
@@ -142,6 +186,21 @@ case $ACTION in
             else
                 echo "3proxy is not running. Start it first with './manage_proxy.sh start 3proxy'"
             fi
+        elif [ "$PROXY_TYPE" = "tinyproxy" ]; then
+            echo "Testing tinyproxy..."
+            if systemctl is-active --quiet tinyproxy; then
+                echo "tinyproxy service is running"
+                
+                # Test if we can get a response through tinyproxy
+                echo "Testing tinyproxy functionality..."
+                if timeout 10 curl -x http://127.0.0.1:8888 -s https://httpbin.org/ip | grep -q "origin" 2>/dev/null; then
+                    echo "tinyproxy test: SUCCESS - Connected through proxy"
+                else
+                    echo "tinyproxy test: FAILED - Cannot connect through proxy"
+                fi
+            else
+                echo "tinyproxy is not running. Start it first with './manage_proxy.sh start tinyproxy'"
+            fi
         else
             echo "Testing Tor proxy..."
             if systemctl is-active --quiet tor; then
@@ -167,13 +226,16 @@ case $ACTION in
         echo "  status - Show proxy status"
         echo "  test   - Test proxy functionality"
         echo ""
-        echo "  proxy_type: tor (default) or 3proxy"
+        echo "  proxy_type: tor (default), 3proxy, or tinyproxy"
         echo ""
         echo "  Examples:"
-        echo "    $0 start          # Start Tor proxy"
-        echo "    $0 start 3proxy   # Start 3proxy"
-        echo "    $0 status tor     # Check Tor status"
-        echo "    $0 status 3proxy  # Check 3proxy status"
+        echo "    $0 start            # Start Tor proxy (default)"
+        echo "    $0 start tor        # Start Tor proxy"
+        echo "    $0 start 3proxy     # Start 3proxy"
+        echo "    $0 start tinyproxy  # Start tinyproxy"
+        echo "    $0 status tor       # Check Tor status"
+        echo "    $0 status 3proxy    # Check 3proxy status"
+        echo "    $0 status tinyproxy # Check tinyproxy status"
         exit 1
         ;;
 esac
