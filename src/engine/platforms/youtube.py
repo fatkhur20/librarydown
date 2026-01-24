@@ -4,6 +4,8 @@ import os
 import yt_dlp
 from src.engine.base_downloader import BaseDownloader
 from src.core.config import settings
+from src.utils.cookie_manager import cookie_manager
+from src.utils.exceptions import handle_platform_exception
 from loguru import logger
 
 
@@ -30,15 +32,12 @@ class YouTubeDownloader(BaseDownloader):
                 'skip_download': True,
             }
             
-            # Add cookies file if exists (copy to temp to avoid permission issues)
-            cookies_path = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), 'cookies', 'youtube_cookies.txt')
-            if os.path.exists(cookies_path):
-                import shutil
-                import tempfile
-                temp_cookies = os.path.join(tempfile.gettempdir(), f'yt_cookies_{os.getpid()}.txt')
-                shutil.copy2(cookies_path, temp_cookies)
-                ydl_opts['cookiefile'] = temp_cookies
-                logger.info(f"[{self.platform}] Using cookies from: {cookies_path}")
+            # Add cookies file if exists using centralized cookie manager
+            cookie_options = cookie_manager.get_ytdlp_options(self.platform)
+            ydl_opts.update(cookie_options)
+            
+            if cookie_options:
+                logger.info(f"[{self.platform}] Using cookies for format detection")
             
             with yt_dlp.YoutubeDL(ydl_opts) as ydl:
                 info = ydl.extract_info(url, download=False)
@@ -139,7 +138,8 @@ class YouTubeDownloader(BaseDownloader):
                 
         except Exception as e:
             logger.error(f"[{self.platform}] Error fetching formats: {e}")
-            raise
+            # Convert to standardized exception
+            raise handle_platform_exception(self.platform, url, e)
     
     async def download(self, url: str, quality: str = "720p") -> Dict[str, Any]:
         """Download YouTube video using yt-dlp library
@@ -163,15 +163,12 @@ class YouTubeDownloader(BaseDownloader):
                 'skip_download': True,
             }
             
-            # Add cookies file if exists (copy to temp to avoid permission issues)
-            cookies_path = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), 'cookies', 'youtube_cookies.txt')
-            if os.path.exists(cookies_path):
-                import shutil
-                import tempfile
-                temp_cookies = os.path.join(tempfile.gettempdir(), f'yt_cookies_{os.getpid()}.txt')
-                shutil.copy2(cookies_path, temp_cookies)
-                ydl_opts_info['cookiefile'] = temp_cookies
-                logger.info(f"[{self.platform}] Using cookies for download")
+            # Add cookies file if exists using centralized cookie manager
+            cookie_options = cookie_manager.get_ytdlp_options(self.platform)
+            ydl_opts_info.update(cookie_options)
+            
+            if cookie_options:
+                logger.info(f"[{self.platform}] Using cookies for metadata extraction")
             
             with yt_dlp.YoutubeDL(ydl_opts_info) as ydl:
                 logger.info(f"[{self.platform}] Extracting video information...")
@@ -237,9 +234,9 @@ class YouTubeDownloader(BaseDownloader):
             for download_info in downloads:
                 logger.info(f"[{self.platform}] Downloading {download_info['type']}...")
                 
-                # Add cookies to download options
-                if os.path.exists(cookies_path):
-                    download_info['opts']['cookiefile'] = cookies_path
+                # Add cookies to download options using centralized manager
+                download_cookie_options = cookie_manager.get_ytdlp_options(self.platform)
+                download_info['opts'].update(download_cookie_options)
                 
                 with yt_dlp.YoutubeDL(download_info['opts']) as ydl:
                     ydl.download([url])

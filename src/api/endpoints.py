@@ -1,4 +1,4 @@
-from fastapi import APIRouter, HTTPException, Depends, Request
+from fastapi import APIRouter, HTTPException, Depends, Request, BackgroundTasks
 from src.api.schemas import DownloadRequest, DownloadResponse, TaskStatusResponse, DownloadHistoryResponse, FormatsResponse
 from src.workers.tasks import download_media_task, detect_platform
 from src.workers.celery_app import celery_app
@@ -7,11 +7,15 @@ from src.database.models import DownloadHistory, TaskStatus, PlatformType
 from sqlalchemy.orm import Session
 from celery.result import AsyncResult
 from pydantic import HttpUrl
-from datetime import datetime
+from datetime import datetime, timedelta
 from loguru import logger
 from slowapi import Limiter
 from slowapi.util import get_remote_address
 from typing import List, Optional
+import asyncio
+import tempfile
+import os
+from fastapi.responses import FileResponse
 
 router = APIRouter()
 limiter = Limiter(key_func=get_remote_address)
@@ -253,7 +257,242 @@ async def get_download_history(
     
     return history
 
-@router.get("/formats", response_model=FormatsResponse, summary="Get available formats for a video")
+@router.get("/download-sync", summary="Download media synchronously in one step")
+@limiter.limit("5/minute")
+async def download_sync(
+    request: Request,
+    url: HttpUrl,
+    quality: Optional[str] = "720p",
+    db: Session = Depends(get_db)
+):
+    """
+    Synchronous download endpoint that returns the media file directly.
+    This is a single-step process unlike the async download which requires polling.
+    
+    **Usage:**
+    `/api/v1/download-sync?url=https://youtube.com/watch?v=xxx&quality=720p`
+    
+    **Note:** This endpoint may take longer to respond as it waits for the download to complete.
+    For large files or slow connections, the async endpoint might be preferred.
+    """
+    from src.utils.security import security_validator
+    
+    url_str = str(url)
+    
+    # Validate URL security
+    is_valid, error = security_validator.validate_url(url_str)
+    if not is_valid:
+        raise HTTPException(status_code=400, detail=f"Invalid URL: {error}")
+    
+    platform = detect_platform(url_str)
+    
+    if platform == "unknown":
+        raise HTTPException(
+            status_code=400,
+            detail="Unsupported platform. Supported: TikTok, YouTube, Instagram, Reddit, SoundCloud, Dailymotion, Twitch, Vimeo, Facebook, Bilibili, LinkedIn, Pinterest"
+        )
+    
+    # Create download history record
+    history = DownloadHistory(
+        task_id="sync_" + url_str.replace(":", "").replace("/", "_")[:16],  # Use sanitized URL as pseudo-task ID
+        url=url_str,
+        platform=PlatformType[platform.upper()],
+        status=TaskStatus.PENDING,
+        ip_address=request.client.host if request.client else None,
+        user_agent=request.headers.get("user-agent")
+    )
+    
+    try:
+        # Get appropriate downloader
+        if platform == "youtube":
+            from src.engine.platforms.youtube import YouTubeDownloader
+            downloader = YouTubeDownloader()
+        elif platform == "tiktok":
+            from src.engine.platforms.tiktok import TikTokDownloader
+            downloader = TikTokDownloader()
+        elif platform == "instagram":
+            from src.engine.platforms.instagram import InstagramDownloader
+            downloader = InstagramDownloader()
+        elif platform == "soundcloud":
+            from src.engine.platforms.soundcloud import SoundCloudDownloader
+            downloader = SoundCloudDownloader()
+        elif platform == "dailymotion":
+            from src.engine.platforms.dailymotion import DailymotionDownloader
+            downloader = DailymotionDownloader()
+        elif platform == "twitch":
+            from src.engine.platforms.twitch import TwitchDownloader
+            downloader = TwitchDownloader()
+        elif platform == "reddit":
+            from src.engine.platforms.reddit import RedditDownloader
+            downloader = RedditDownloader()
+        elif platform == "vimeo":
+            from src.engine.platforms.vimeo import VimeoDownloader
+            downloader = VimeoDownloader()
+        elif platform == "facebook":
+            from src.engine.platforms.facebook import FacebookDownloader
+            downloader = FacebookDownloader()
+        elif platform == "bilibili":
+            from src.engine.platforms.bilibili import BilibiliDownloader
+            downloader = BilibiliDownloader()
+        elif platform == "linkedin":
+            from src.engine.platforms.linkedin import LinkedInDownloader
+            downloader = LinkedInDownloader()
+        elif platform == "pinterest":
+            from src.engine.platforms.pinterest import PinterestDownloader
+            downloader = PinterestDownloader()
+        else:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Sync download not yet implemented for {platform}"
+            )
+        
+        # Perform download synchronously
+        logger.info(f"[API] Starting synchronous download for {platform}: {url_str} (quality: {quality})")
+        
+        # Update history status
+        history.status = TaskStatus.PROGRESS
+        db.add(history)
+        db.commit()
+        
+        # Download the media
+        result = await downloader.download(url_str, quality=quality)
+        
+        # Update history with success
+        history.status = TaskStatus.SUCCESS
+        history.completed_at = datetime.utcnow()
+        data = result if isinstance(result, dict) else {"title": "Downloaded Content"}
+        history.title = data.get('title', data.get('caption', ''))[:200]
+        history.author = data.get('author', {}).get('username')
+        history.duration = data.get('duration')
+        db.commit()
+        
+        # Extract the file path from the result
+        video_files = data.get('media', {}).get('video', [])
+        if video_files:
+            # Look for the actual downloaded file in the media folder
+            from src.core.config import settings
+            import glob
+            
+            # Try to find the file that was downloaded based on video ID
+            video_id = data.get('id', url_str.split('/')[-1][:20])  # fallback to part of URL
+            media_path = settings.MEDIA_FOLDER
+            
+            # Look for files matching the pattern
+            possible_files = []
+            for ext in ['.mp4', '.m4a', '.mov', '.avi', '.flv']:
+                pattern = os.path.join(media_path, f"{video_id}*{ext}")
+                matches = glob.glob(pattern)
+                possible_files.extend(matches)
+            
+            # Also look for common patterns used by downloaders
+            if not possible_files:
+                for ext in ['.mp4', '.m4a', '.mov', '.avi', '.flv']:
+                    pattern = os.path.join(media_path, f"*{video_id[:10]}*{ext}")  # partial match
+                    matches = glob.glob(pattern)
+                    possible_files.extend(matches)
+            
+            if possible_files:
+                # Use the most recently modified file
+                latest_file = max(possible_files, key=os.path.getmtime)
+                filename = os.path.basename(latest_file)
+                
+                logger.info(f"[API] Returning file: {latest_file}")
+                return FileResponse(
+                    path=latest_file,
+                    filename=filename,
+                    media_type='video/mp4' if filename.endswith('.mp4') else 'audio/mpeg' if filename.endswith('.m4a') else 'application/octet-stream'
+                )
+            else:
+                # If no specific file found, try to get from the result URLs
+                for video_file in video_files:
+                    file_url = video_file.get('url', '')
+                    if file_url:
+                        # Extract filename from URL
+                        filename = file_url.split('/')[-1]
+                        local_file_path = os.path.join(media_path, filename)
+                        
+                        if os.path.exists(local_file_path):
+                            logger.info(f"[API] Returning file: {local_file_path}")
+                            return FileResponse(
+                                path=local_file_path,
+                                filename=filename,
+                                media_type='video/mp4' if filename.endswith('.mp4') else 'audio/mpeg' if filename.endswith('.m4a') else 'application/octet-stream'
+                            )
+        
+        # If no file could be found/returned, return metadata
+        logger.warning(f"[API] Could not find downloaded file, returning metadata instead")
+        return {
+            "status": "completed",
+            "platform": platform,
+            "title": data.get('title'),
+            "result": result,
+            "message": "Download completed but file not available for direct serving. Check media folder or use async endpoint for file access."
+        }
+        
+    except Exception as e:
+        # Update history with failure
+        db.rollback()
+        history.status = TaskStatus.FAILURE
+        history.error_message = str(e)
+        db.add(history)
+        db.commit()
+        
+        logger.error(f"[API] Sync download failed: {e}")
+        raise HTTPException(status_code=500, detail=f"Sync download failed: {str(e)}")
+
+
+@router.get("/health", summary="Health check endpoint")
+async def health_check():
+    """
+    Simple health check endpoint for monitoring.
+    Returns 200 OK if service is running properly.
+    """
+    return {
+        "status": "healthy",
+        "service": settings.APP_NAME,
+        "version": settings.VERSION,
+        "timestamp": datetime.utcnow().isoformat()
+    }
+
+@router.get("/metrics", summary="System metrics")
+async def get_metrics(db: Session = Depends(get_db)):
+    """
+    Get system metrics and statistics.
+    """
+    try:
+        # Get download statistics
+        total_downloads = db.query(DownloadHistory).count()
+        successful_downloads = db.query(DownloadHistory).filter(
+            DownloadHistory.status == TaskStatus.SUCCESS
+        ).count()
+        
+        # Get recent activity
+        last_24h = datetime.utcnow() - timedelta(hours=24)
+        recent_downloads = db.query(DownloadHistory).filter(
+            DownloadHistory.created_at >= last_24h
+        ).count()
+        
+        # Get cache stats if available
+        cache_stats = {}
+        try:
+            from src.utils.cache import cache_manager
+            cache_stats = cache_manager.get_stats()
+        except ImportError:
+            cache_stats = {"enabled": False}
+        
+        return {
+            "downloads": {
+                "total": total_downloads,
+                "successful": successful_downloads,
+                "recent_24h": recent_downloads,
+                "success_rate": round(successful_downloads/total_downloads*100, 2) if total_downloads > 0 else 0
+            },
+            "cache": cache_stats,
+            "timestamp": datetime.utcnow().isoformat()
+        }
+    except Exception as e:
+        logger.error(f"Metrics endpoint error: {e}")
+        raise HTTPException(status_code=500, detail="Unable to fetch metrics")
 @limiter.limit("20/minute")
 async def get_video_formats(
     request: Request,

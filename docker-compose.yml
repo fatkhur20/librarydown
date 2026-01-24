@@ -1,0 +1,74 @@
+version: '3.8'
+
+services:
+  redis:
+    image: redis:7-alpine
+    container_name: librarydown-redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    command: redis-server --appendonly yes
+    restart: unless-stopped
+    networks:
+      - librarydown-network
+
+  api:
+    build: .
+    container_name: librarydown-api
+    ports:
+      - "8000:8000"
+    environment:
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - DEBUG=False
+    volumes:
+      - ./media:/app/media
+      - ./cookies:/app/cookies
+    depends_on:
+      - redis
+    restart: unless-stopped
+    networks:
+      - librarydown-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  worker:
+    build: .
+    container_name: librarydown-worker
+    command: celery -A src.workers.celery_app worker --loglevel=info
+    environment:
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+    volumes:
+      - ./media:/app/media
+      - ./cookies:/app/cookies
+    depends_on:
+      - redis
+      - api
+    restart: unless-stopped
+    networks:
+      - librarydown-network
+
+  beat:
+    build: .
+    container_name: librarydown-beat
+    command: celery -A src.workers.celery_app beat --loglevel=info
+    environment:
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+    depends_on:
+      - redis
+    restart: unless-stopped
+    networks:
+      - librarydown-network
+
+networks:
+  librarydown-network:
+    driver: bridge
+
+volumes:
+  redis_data:

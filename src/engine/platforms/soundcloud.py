@@ -26,9 +26,7 @@ class SoundCloudDownloader(BaseDownloader):
             "\n   - KlickAud: https://www.klickaud.co/"
             "\n\n2. Browser extensions:"
             "\n   - SoundCloud Downloader (Chrome/Firefox)"
-            "\n   - Sound Downloa
-
-der"
+            "\n   - Sound Downloader"
             "\n\n3. Command-line tools:"
             "\n   - scdl: pip install scdl && scdl -l <track_url>"
             "\n   - yt-dlp (direct): yt-dlp <soundcloud_url>"

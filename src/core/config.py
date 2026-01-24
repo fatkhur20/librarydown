@@ -8,8 +8,12 @@ class Settings(BaseSettings):
     API_BASE_URL: str = "http://localhost:8001"  # Different port to avoid conflict with apichecker
 
     # Security
-    ALLOWED_ORIGINS: list = ["*"]  # CORS origins
+    ALLOWED_ORIGINS: list = ["http://localhost", "http://127.0.0.1"]  # Restricted CORS origins
     RATE_LIMIT_PER_MINUTE: int = 10  # API rate limit per IP
+    
+    # Security enhancements
+    SECRET_KEY: str = ""  # Should be set via environment variable
+    ACCESS_TOKEN_EXPIRE_MINUTES: int = 30
 
     # Redis Settings
     REDIS_HOST: str = "localhost"
