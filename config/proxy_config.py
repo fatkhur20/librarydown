@@ -5,11 +5,11 @@ Proxy Configuration for LibraryDown
 class ProxyConfig:
     """Configuration class for proxy settings"""
     
-    # Proxy settings - Default to Tor
-    USE_PROXY = True
-    PROXY_TYPE = "socks5"  # socks5, http, https
+    # Proxy settings - Enable tinyproxy
+    USE_PROXY = True  # Set to True when proxy is configured and running
+    PROXY_TYPE = "http"  # socks5, http, https
     PROXY_HOST = "127.0.0.1"
-    PROXY_PORT = 9050  # Default Tor port, change to 2080 for 3proxy
+    PROXY_PORT = 8888  # Default Tor port, change to 2080 for 3proxy, 8888 for tinyproxy
     PROXY_URL = f"{PROXY_TYPE}://{PROXY_HOST}:{PROXY_PORT}"
     
     # Alternative proxy settings
