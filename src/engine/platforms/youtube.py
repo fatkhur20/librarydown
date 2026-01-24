@@ -6,6 +6,7 @@ from src.engine.base_downloader import BaseDownloader
 from src.core.config import settings
 from src.utils.cookie_manager import cookie_manager
 from src.utils.exceptions import handle_platform_exception
+from src.config.proxy_config import ProxyConfig
 from loguru import logger
 
 
@@ -41,6 +42,10 @@ class YouTubeDownloader(BaseDownloader):
             # Add cookies file if exists using centralized cookie manager
             cookie_options = cookie_manager.get_ytdlp_options(self.platform)
             ydl_opts.update(cookie_options)
+            
+            # Add proxy configuration
+            proxy_options = ProxyConfig.get_yt_dlp_proxy_options(self.platform)
+            ydl_opts.update(proxy_options)
             
             if cookie_options:
                 logger.info(f"[{self.platform}] Using cookies for format detection")
@@ -179,6 +184,10 @@ class YouTubeDownloader(BaseDownloader):
             cookie_options = cookie_manager.get_ytdlp_options(self.platform)
             ydl_opts_info.update(cookie_options)
             
+            # Add proxy configuration
+            proxy_options = ProxyConfig.get_yt_dlp_proxy_options(self.platform)
+            ydl_opts_info.update(proxy_options)
+            
             if cookie_options:
                 logger.info(f"[{self.platform}] Using cookies for metadata extraction")
             
@@ -217,7 +226,8 @@ class YouTubeDownloader(BaseDownloader):
                             'youtube': {
                                 'player_client': ['tv_embedded'],
                             }
-                        }
+                        },
+                        'proxy': ProxyConfig.PROXY_URL
                     }
                 })
             else:
@@ -248,7 +258,8 @@ class YouTubeDownloader(BaseDownloader):
                             'youtube': {
                                 'player_client': ['tv_embedded'],
                             }
-                        }
+                        },
+                        'proxy': ProxyConfig.PROXY_URL
                     }
                 })
                 
@@ -265,7 +276,8 @@ class YouTubeDownloader(BaseDownloader):
                             'youtube': {
                                 'player_client': ['tv_embedded'],
                             }
-                        }
+                        },
+                        'proxy': ProxyConfig.PROXY_URL
                     }
                 })
             
