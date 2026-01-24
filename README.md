@@ -88,12 +88,12 @@ cd librarydown
 
 ```bash
 # Traditional setup
-chmod +x setup.sh
-./setup.sh
+chmod +x scripts/setup/setup.sh
+./scripts/setup/setup.sh
 
-# Or use the new comprehensive management system
-chmod +x master-manager.sh
-./master-manager.sh setup
+# Or use the comprehensive management system
+chmod +x scripts/utils/master-manager.sh
+./scripts/utils/master-manager.sh setup
 ```
 
 The traditional setup script will automatically:
@@ -139,7 +139,7 @@ TELEGRAM_USER_ID=your_telegram_user_id
 4. Start the bot:
 
 ```bash
-./start_bot.sh
+./scripts/utils/start_bot.sh
 ```
 
 ---
@@ -250,61 +250,52 @@ curl -O "http://localhost:8000/api/v1/download-sync?url=https://www.youtube.com/
 curl -O "http://localhost:8000/api/v1/download-sync?url=https://www.youtube.com/watch?v=dQw4w9WgXcQ&quality=audio"
 ```
 
-Untuk dokumentasi API lengkap, lihat [API Documentation](docs/API.md).
+Untuk dokumentasi API lengkap, lihat [API Documentation](docs/api/).
 
 ---
 
 ## 📁 Project Structure
 
+Detailed project structure can be found in [PROJECT_STRUCTURE.md](PROJECT_STRUCTURE.md).
+
 ```
 librarydown/
+├── README.md
+├── requirements.txt
+├── .env.example
+├── Dockerfile
+├── docker-compose.yml
 ├── src/
-│   ├── api/                    # FastAPI application
-│   │   ├── main.py            # App initialization, middleware
-│   │   ├── endpoints.py       # API routes (includes new /download-sync)
-│   │   └── schemas.py         # Pydantic models
-│   │
-│   ├── bot_downloader.py      # NEW! Telegram bot for direct downloads
-│   │
-│   ├── core/                   # Core configuration
-│   │   └── config.py          # Settings management
-│   │
-│   ├── database/               # Database layer
-│   │   ├── base.py            # SQLAlchemy setup
-│   │   └── models.py          # Database models
-│   │
-│   ├── engine/                 # Download engine
-│   │   ├── base_downloader.py # Abstract base class
-│   │   ├── extractor.py       # Data extractor base
-│   │   └── platforms/         # Platform implementations
-│   │       ├── tiktok.py      # TikTok downloader
-│   │       ├── youtube.py     # YouTube downloader
-│   │       ├── instagram.py   # Instagram (placeholder)
-│   │       └── twitter.py     # Twitter (placeholder)
-│   │
-│   ├── utils/                  # NEW! Shared utilities
-│   │   ├── security.py        # Security validation
-│   │   ├── cache.py           # Caching utilities
-│   │   ├── cookie_manager.py  # Cookie management
-│   │   ├── exceptions.py      # Custom exceptions
-│   │   └── url_validator.py   # URL validation
-│   │
-│   └── workers/                # Celery workers
-│       ├── celery_app.py      # Celery configuration
-│       ├── tasks.py           # Download tasks
-│       └── cleanup.py         # File cleanup task
-│
-├── docs/                       # Documentation
-│   ├── API.md                 # API documentation
-│   └── ROADMAP.md             # Project roadmap
-│
-├── media/                      # Downloaded files (auto-created)
-├── .env                        # Environment variables
-├── .env.example               # Environment template
-├── requirements.txt           # Python dependencies
-├── setup.sh                   # Setup automation script
-├── start_bot.sh               # NEW! Telegram bot startup script
-└── README.md                  # This file
+│   ├── api/
+│   ├── core/
+│   ├── database/
+│   ├── engine/
+│   │   └── platforms/
+│   ├── utils/
+│   └── workers/
+├── tests/
+│   ├── unit/
+│   ├── integration/
+│   ├── e2e/
+│   └── fixtures/
+├── docs/
+│   ├── api/
+│   ├── guides/
+│   ├── security/
+│   └── development/
+├── scripts/
+│   ├── setup/
+│   ├── deploy/
+│   ├── systemd/
+│   ├── security/
+│   └── utils/
+├── data/
+│   ├── db/
+│   ├── logs/
+│   └── temp/
+├── media/
+├── cookies/
+└── venv/
 ```
 
 ---
@@ -384,8 +375,21 @@ TELEGRAM_USER_ID=your_user_id_here        # Your Telegram user ID
 # Install test dependencies
 pip install pytest pytest-asyncio httpx
 
-# Run tests
-pytest
+# Run unit tests
+pytest tests/unit/
+```
+
+### Running All Tests
+
+```bash
+# Run integration tests
+pytest tests/integration/
+
+# Run end-to-end tests
+pytest tests/e2e/
+
+# Run all tests
+pytest tests/
 ```
 
 ### Code Quality

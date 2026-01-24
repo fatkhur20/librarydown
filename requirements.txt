@@ -1,27 +1,17 @@
-# Core Frameworks
-fastapi
-uvicorn[standard]
-pydantic
-pydantic-settings
+# LibraryDown - Universal Social Media Downloader
+# Main requirements
 
-# Worker & Queue
-celery
-redis
-
-# Database
-sqlalchemy
-alembic
-aiosqlite
-
-# Security & Rate Limiting
-slowapi
-python-jose[cryptography]
-passlib[bcrypt]
-python-multipart
-
-# Utilities
-python-dotenv
-httpx
-loguru
-aiofiles
-yt-dlp
+fastapi==0.115.0
+uvicorn[standard]==0.32.0
+celery==5.4.0
+redis==5.2.0
+sqlalchemy==2.0.36
+pydantic==2.10.1
+pydantic-settings==2.6.1
+loguru==0.7.2
+slowapi==0.1.9
+httpx==0.28.1
+yt-dlp==2024.11.18
+python-multipart==0.0.20
+aiofiles==24.1.0
+python-telegram-bot==22.5
