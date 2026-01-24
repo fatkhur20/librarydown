@@ -55,22 +55,34 @@ install_deps() {
     
     cd "$LIBRARYDOWN_DIR"
     
+    # Remove old venv if it exists with old Python version
+    if [ -d "venv" ]; then
+        VENV_PYTHON_VERSION=$(venv/bin/python3 --version 2>&1 | grep -oP '\d+\.\d+')
+        if [[ "$VENV_PYTHON_VERSION" < "3.10" ]]; then
+            echo "[INFO] Removing old virtual environment (Python $VENV_PYTHON_VERSION)..."
+            rm -rf venv
+        fi
+    fi
+    
     # Check if virtual environment exists, create if not
     if [ ! -d "venv" ]; then
-        echo "[INFO] Creating virtual environment..."
+        echo "[INFO] Creating virtual environment with Python 3.13..."
         python3 -m venv venv
     fi
     
     # Activate virtual environment
     source venv/bin/activate
     
-    # Install/update requirements
-    pip3 install --upgrade pip
-    pip3 install -r requirements.txt
+    # Install/update requirements using global PyPI (not Aliyun mirror)
+    echo "[INFO] Upgrading pip..."
+    pip3 install --upgrade pip --index-url https://pypi.org/simple
+    
+    echo "[INFO] Installing requirements from PyPI..."
+    pip3 install -r requirements.txt --index-url https://pypi.org/simple
     
     # Install telegram python library if not present
     if ! python3 -c "import telegram" >/dev/null 2>&1; then
-        pip3 install python-telegram-bot
+        pip3 install python-telegram-bot --index-url https://pypi.org/simple
     fi
     
     echo "[SUCCESS] Dependencies installed"
