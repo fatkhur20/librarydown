@@ -225,7 +225,7 @@ User=$APP_USER
 WorkingDirectory=$APP_DIR
 EnvironmentFile=$APP_DIR/.env
 Environment="PATH=$APP_DIR/venv/bin"
-ExecStart=$APP_DIR/venv/bin/uvicorn src.main:app --host 0.0.0.0 --port 8001 --workers 2
+ExecStart=$APP_DIR/venv/bin/uvicorn src.api.main:app --host 0.0.0.0 --port 8001 --workers 2
 Restart=always
 RestartSec=10
 

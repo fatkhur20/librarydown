@@ -229,7 +229,7 @@ start_services_manual() {
             source venv/bin/activate
         fi
         pkill -f "uvicorn.*8001" 2>/dev/null || true
-        nohup uvicorn src.main:app --host 0.0.0.0 --port 8001 --workers 2 > /root/librarydown/api_server.log 2>&1 &
+        nohup uvicorn src.api.main:app --host 0.0.0.0 --port 8001 --workers 2 > /root/librarydown/api_server.log 2>&1 &
         sleep 2
     else
         echo "[SKIPPED] LibraryDown API due to port conflict"
