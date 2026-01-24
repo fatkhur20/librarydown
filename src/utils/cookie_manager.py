@@ -17,12 +17,19 @@ class CookieManager:
         Args:
             base_path: Base path for cookie files. Defaults to project root.
         """
-        if base_path is None:
-            # Navigate up from src/utils to project root
-            base_path = Path(__file__).parent.parent.parent
-            
-        self.base_path = Path(base_path)
-        self.cookies_dir = self.base_path / "cookies"
+        # First try /opt/librarydown/cookies (production/bot upload location)
+        production_path = Path("/opt/librarydown/cookies")
+        if production_path.exists():
+            self.cookies_dir = production_path
+            logger.info(f"Using production cookie directory: {self.cookies_dir}")
+        else:
+            # Fallback to project relative path
+            if base_path is None:
+                # Navigate up from src/utils to project root
+                base_path = Path(__file__).parent.parent.parent
+            self.base_path = Path(base_path)
+            self.cookies_dir = self.base_path / "cookies"
+            logger.info(f"Using local cookie directory: {self.cookies_dir}")
         
     def get_platform_cookies(self, platform: str) -> Optional[str]:
         """Get path to platform-specific cookie file.
