@@ -31,7 +31,11 @@ class InstagramDownloader(BaseDownloader):
             }
             
             # Add cookies file if exists (copy to temp to avoid permission issues)
-            cookies_path = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), 'cookies', 'instagram_cookies.txt')
+            # Try both possible cookie locations
+            cookies_path = '/opt/librarydown/cookies/instagram_cookies.txt'
+            if not os.path.exists(cookies_path):
+                cookies_path = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), 'cookies', 'instagram_cookies.txt')
+            
             if os.path.exists(cookies_path):
                 import shutil
                 import tempfile
@@ -121,7 +125,11 @@ class InstagramDownloader(BaseDownloader):
             }
             
             # Add cookies file if exists (copy to temp to avoid permission issues)
-            cookies_path = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), 'cookies', 'instagram_cookies.txt')
+            # Try both possible cookie locations
+            cookies_path = '/opt/librarydown/cookies/instagram_cookies.txt'
+            if not os.path.exists(cookies_path):
+                cookies_path = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), 'cookies', 'instagram_cookies.txt')
+            
             if os.path.exists(cookies_path):
                 import shutil
                 import tempfile
@@ -129,7 +137,7 @@ class InstagramDownloader(BaseDownloader):
                 shutil.copy2(cookies_path, temp_cookies)
                 os.chmod(temp_cookies, 0o644)
                 ydl_opts_info['cookiefile'] = temp_cookies
-                logger.info(f"[{self.platform}] Using cookies for download")
+                logger.info(f"[{self.platform}] Using cookies for download from: {cookies_path}")
             
             with yt_dlp.YoutubeDL(ydl_opts_info) as ydl:
                 logger.info(f"[{self.platform}] Extracting metadata...")
