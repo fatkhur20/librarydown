@@ -23,8 +23,16 @@ class YouTubeDownloader(BaseDownloader):
         Returns:
             Dict containing video metadata and available formats
         """
+        import random
+        import time
+        
         try:
             logger.info(f"[{self.platform}] Fetching formats for: {url}")
+            
+            # Add human-like delay before request
+            delay = random.uniform(1.0, 3.0)  # Random delay 1-3 seconds
+            logger.info(f"[{self.platform}] Waiting {delay:.2f}s before request to mimic human behavior")
+            time.sleep(delay)
             
             ydl_opts = {
                 'quiet': True,
@@ -57,11 +65,32 @@ class YouTubeDownloader(BaseDownloader):
             if cookie_options:
                 logger.info(f"[{self.platform}] Using cookies for format detection")
             
-            with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-                info = ydl.extract_info(url, download=False)
-                
-                if not info:
-                    raise ValueError("Failed to extract video information")
+            # Add retry mechanism for captcha errors in format detection
+            import random
+            import time
+            max_retries = 3
+            retry_delay = 2  # Start with 2 seconds
+            
+            for attempt in range(max_retries):
+                try:
+                    with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+                        info = ydl.extract_info(url, download=False)
+                        
+                        if not info:
+                            raise ValueError("Failed to extract video information")
+                        break  # Success, exit retry loop
+                        
+                except Exception as e:
+                    if "captcha" in str(e).lower() or "152 - 18" in str(e):
+                        if attempt < max_retries - 1:  # Not the last attempt
+                            delay = retry_delay * (2 ** attempt) + random.uniform(1, 3)  # Exponential backoff + jitter
+                            logger.warning(f"[{self.platform}] Captcha detected in format detection, retrying in {delay:.2f}s...")
+                            time.sleep(delay)
+                            continue
+                        else:
+                            raise  # Re-raise the last exception
+                    else:
+                        raise  # Re-raise if it's not a captcha error
                 
                 # Extract metadata
                 video_id = info.get('id')
@@ -168,8 +197,16 @@ class YouTubeDownloader(BaseDownloader):
         
         Note: When downloading video, audio-only version is also downloaded automatically
         """
+        import random
+        import time
+        
         try:
             logger.info(f"[{self.platform}] Processing URL: {url} (requested quality: {quality})")
+            
+            # Add human-like delay before request
+            delay = random.uniform(1.5, 4.0)  # Random delay 1.5-4 seconds
+            logger.info(f"[{self.platform}] Waiting {delay:.2f}s before download request to mimic human behavior")
+            time.sleep(delay)
             
             # Check if audio-only is requested
             is_audio_only = quality.lower() == 'audio'
@@ -206,12 +243,33 @@ class YouTubeDownloader(BaseDownloader):
             if cookie_options:
                 logger.info(f"[{self.platform}] Using cookies for metadata extraction")
             
-            with yt_dlp.YoutubeDL(ydl_opts_info) as ydl:
-                logger.info(f"[{self.platform}] Extracting video information...")
-                info = ydl.extract_info(url, download=False)
-                
-                if not info:
-                    raise ValueError("Failed to extract video information")
+            # Add retry mechanism for captcha errors
+            import random
+            import time
+            max_retries = 3
+            retry_delay = 2  # Start with 2 seconds
+            
+            for attempt in range(max_retries):
+                try:
+                    with yt_dlp.YoutubeDL(ydl_opts_info) as ydl:
+                        logger.info(f"[{self.platform}] Extracting video information (attempt {attempt + 1})...")
+                        info = ydl.extract_info(url, download=False)
+                        
+                        if not info:
+                            raise ValueError("Failed to extract video information")
+                        break  # Success, exit retry loop
+                        
+                except Exception as e:
+                    if "captcha" in str(e).lower() or "152 - 18" in str(e):
+                        if attempt < max_retries - 1:  # Not the last attempt
+                            delay = retry_delay * (2 ** attempt) + random.uniform(1, 3)  # Exponential backoff + jitter
+                            logger.warning(f"[{self.platform}] Captcha detected, retrying in {delay:.2f}s...")
+                            time.sleep(delay)
+                            continue
+                        else:
+                            raise  # Re-raise the last exception
+                    else:
+                        raise  # Re-raise if it's not a captcha error
                 
                 # Get video metadata
                 video_id = info.get('id')
@@ -331,15 +389,43 @@ class YouTubeDownloader(BaseDownloader):
             
             # Download all formats
             downloaded_files = []
-            for download_info in downloads:
+            import random
+            import time
+            
+            for i, download_info in enumerate(downloads):
                 logger.info(f"[{self.platform}] Downloading {download_info['type']}...")
+                
+                # Add delay between format downloads to mimic human behavior
+                if i > 0:  # Only add delay after the first download
+                    delay = random.uniform(0.5, 2.0)  # Random delay 0.5-2 seconds between downloads
+                    logger.info(f"[{self.platform}] Waiting {delay:.2f}s between downloads")
+                    time.sleep(delay)
                 
                 # Add cookies to download options using centralized manager
                 download_cookie_options = cookie_manager.get_ytdlp_options(self.platform)
                 download_info['opts'].update(download_cookie_options)
                 
-                with yt_dlp.YoutubeDL(download_info['opts']) as ydl:
-                    ydl.download([url])
+                # Add retry mechanism for captcha errors during download
+                max_retries = 2
+                retry_delay = 3  # Start with 3 seconds for downloads
+                
+                for attempt in range(max_retries):
+                    try:
+                        with yt_dlp.YoutubeDL(download_info['opts']) as ydl:
+                            ydl.download([url])
+                        break  # Success, exit retry loop
+                        
+                    except Exception as e:
+                        if "captcha" in str(e).lower() or "152 - 18" in str(e):
+                            if attempt < max_retries - 1:  # Not the last attempt
+                                delay = retry_delay * (2 ** attempt) + random.uniform(1, 2)  # Exponential backoff + jitter
+                                logger.warning(f"[{self.platform}] Captcha detected during {download_info['type']} download, retrying in {delay:.2f}s...")
+                                time.sleep(delay)
+                                continue
+                            else:
+                                raise  # Re-raise the last exception
+                        else:
+                            raise  # Re-raise if it's not a captcha error
                 downloaded_files.append(download_info['type'])
             
             # Build response with all downloaded files
