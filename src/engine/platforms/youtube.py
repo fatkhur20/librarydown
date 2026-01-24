@@ -1,6 +1,8 @@
 from typing import Any, Dict, Optional
 import json
 import os
+import time
+import random
 import yt_dlp
 from src.engine.base_downloader import BaseDownloader
 from src.core.config import settings
@@ -14,6 +16,46 @@ class YouTubeDownloader(BaseDownloader):
     def platform(self) -> str:
         return "youtube"
     
+    def _simulate_browser_behavior(self, action: str = "general"):
+        """Simulate real browser behavior to avoid bot detection"""
+        import random
+        import time
+        
+        if action == "page_load":
+            # Simulate page load time
+            delay = random.uniform(2.0, 5.0)
+            time.sleep(delay)
+        elif action == "scroll":
+            # Simulate scrolling behavior
+            delay = random.uniform(0.5, 1.5)
+            time.sleep(delay)
+        elif action == "click":
+            # Simulate clicking behavior
+            delay = random.uniform(0.3, 1.0)
+            time.sleep(delay)
+        elif action == "general":
+            # General human-like delay
+            delay = random.uniform(0.5, 2.0)
+            time.sleep(delay)
+    
+    def _get_realistic_headers(self):
+        """Return realistic browser headers to mimic real browser"""
+        return {
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+            'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,image/apng,*/*;q=0.8',
+            'Accept-Language': 'en-US,en;q=0.9',
+            'Accept-Encoding': 'gzip, deflate, br',
+            'Connection': 'keep-alive',
+            'Upgrade-Insecure-Requests': '1',
+            'Sec-Fetch-Dest': 'document',
+            'Sec-Fetch-Mode': 'navigate',
+            'Sec-Fetch-Site': 'none',
+            'Sec-Fetch-User': '?1',
+            'Cache-Control': 'max-age=0',
+            'DNT': '1',
+            'Referer': 'https://www.google.com/',
+        }
+    
     async def get_formats(self, url: str) -> Dict[str, Any]:
         """Get available formats for a YouTube video without downloading
         
@@ -23,16 +65,11 @@ class YouTubeDownloader(BaseDownloader):
         Returns:
             Dict containing video metadata and available formats
         """
-        import random
-        import time
-        
         try:
             logger.info(f"[{self.platform}] Fetching formats for: {url}")
             
-            # Add human-like delay before request
-            delay = random.uniform(1.0, 3.0)  # Random delay 1-3 seconds
-            logger.info(f"[{self.platform}] Waiting {delay:.2f}s before request to mimic human behavior")
-            time.sleep(delay)
+            # Simulate browser-like behavior before making request
+            self._simulate_browser_behavior("page_load")
             
             ydl_opts = {
                 'quiet': True,
@@ -44,18 +81,7 @@ class YouTubeDownloader(BaseDownloader):
                         'player_client': ['tv_embedded', 'web'],
                     }
                 },
-                'http_headers': {
-                    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-                    'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
-                    'Accept-Language': 'en-US,en;q=0.5',
-                    'Accept-Encoding': 'gzip, deflate',
-                    'Connection': 'keep-alive',
-                    'Upgrade-Insecure-Requests': '1',
-                    'Sec-Fetch-Dest': 'document',
-                    'Sec-Fetch-Mode': 'navigate',
-                    'Sec-Fetch-Site': 'none',
-                    'Cache-Control': 'max-age=0',
-                }
+                'http_headers': self._get_realistic_headers()
             }
             
             # Add cookies file if exists using centralized cookie manager
@@ -66,8 +92,6 @@ class YouTubeDownloader(BaseDownloader):
                 logger.info(f"[{self.platform}] Using cookies for format detection")
             
             # Add retry mechanism for captcha errors in format detection
-            import random
-            import time
             max_retries = 3
             retry_delay = 2  # Start with 2 seconds
             
@@ -83,6 +107,8 @@ class YouTubeDownloader(BaseDownloader):
                 except Exception as e:
                     if "captcha" in str(e).lower() or "152 - 18" in str(e):
                         if attempt < max_retries - 1:  # Not the last attempt
+                            # Simulate browser behavior before retry
+                            self._simulate_browser_behavior("page_load")
                             delay = retry_delay * (2 ** attempt) + random.uniform(1, 3)  # Exponential backoff + jitter
                             logger.warning(f"[{self.platform}] Captcha detected in format detection, retrying in {delay:.2f}s...")
                             time.sleep(delay)
@@ -197,16 +223,11 @@ class YouTubeDownloader(BaseDownloader):
         
         Note: When downloading video, audio-only version is also downloaded automatically
         """
-        import random
-        import time
-        
         try:
             logger.info(f"[{self.platform}] Processing URL: {url} (requested quality: {quality})")
             
-            # Add human-like delay before request
-            delay = random.uniform(1.5, 4.0)  # Random delay 1.5-4 seconds
-            logger.info(f"[{self.platform}] Waiting {delay:.2f}s before download request to mimic human behavior")
-            time.sleep(delay)
+            # Simulate browser-like behavior before making request
+            self._simulate_browser_behavior("click")
             
             # Check if audio-only is requested
             is_audio_only = quality.lower() == 'audio'
@@ -222,18 +243,7 @@ class YouTubeDownloader(BaseDownloader):
                         'player_client': ['tv_embedded', 'web'],
                     }
                 },
-                'http_headers': {
-                    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-                    'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
-                    'Accept-Language': 'en-US,en;q=0.5',
-                    'Accept-Encoding': 'gzip, deflate',
-                    'Connection': 'keep-alive',
-                    'Upgrade-Insecure-Requests': '1',
-                    'Sec-Fetch-Dest': 'document',
-                    'Sec-Fetch-Mode': 'navigate',
-                    'Sec-Fetch-Site': 'none',
-                    'Cache-Control': 'max-age=0',
-                }
+                'http_headers': self._get_realistic_headers()
             }
             
             # Add cookies file if exists using centralized cookie manager
@@ -300,18 +310,7 @@ class YouTubeDownloader(BaseDownloader):
                                 'player_client': ['tv_embedded', 'web'],
                             }
                         },
-                        'http_headers': {
-                            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-                            'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
-                            'Accept-Language': 'en-US,en;q=0.5',
-                            'Accept-Encoding': 'gzip, deflate',
-                            'Connection': 'keep-alive',
-                            'Upgrade-Insecure-Requests': '1',
-                            'Sec-Fetch-Dest': 'document',
-                            'Sec-Fetch-Mode': 'navigate',
-                            'Sec-Fetch-Site': 'none',
-                            'Cache-Control': 'max-age=0',
-                        }
+                        'http_headers': self._get_realistic_headers()
                     }
                 })
             else:
@@ -343,18 +342,7 @@ class YouTubeDownloader(BaseDownloader):
                                 'player_client': ['tv_embedded', 'web'],
                             }
                         },
-                        'http_headers': {
-                            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-                            'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
-                            'Accept-Language': 'en-US,en;q=0.5',
-                            'Accept-Encoding': 'gzip, deflate',
-                            'Connection': 'keep-alive',
-                            'Upgrade-Insecure-Requests': '1',
-                            'Sec-Fetch-Dest': 'document',
-                            'Sec-Fetch-Mode': 'navigate',
-                            'Sec-Fetch-Site': 'none',
-                            'Cache-Control': 'max-age=0',
-                        }
+                        'http_headers': self._get_realistic_headers()
                     }
                 })
                 
@@ -372,18 +360,7 @@ class YouTubeDownloader(BaseDownloader):
                                 'player_client': ['tv_embedded', 'web'],
                             }
                         },
-                        'http_headers': {
-                            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-                            'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
-                            'Accept-Language': 'en-US,en;q=0.5',
-                            'Accept-Encoding': 'gzip, deflate',
-                            'Connection': 'keep-alive',
-                            'Upgrade-Insecure-Requests': '1',
-                            'Sec-Fetch-Dest': 'document',
-                            'Sec-Fetch-Mode': 'navigate',
-                            'Sec-Fetch-Site': 'none',
-                            'Cache-Control': 'max-age=0',
-                        }
+                        'http_headers': self._get_realistic_headers()
                     }
                 })
             
