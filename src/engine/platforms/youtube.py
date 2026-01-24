@@ -30,6 +30,12 @@ class YouTubeDownloader(BaseDownloader):
                 'quiet': True,
                 'no_warnings': True,
                 'skip_download': True,
+                'remote_components': 'ejs:github',
+                'extractor_args': {
+                    'youtube': {
+                        'player_client': ['tv_embedded'],
+                    }
+                }
             }
             
             # Add cookies file if exists using centralized cookie manager
@@ -161,6 +167,12 @@ class YouTubeDownloader(BaseDownloader):
                 'quiet': True,
                 'no_warnings': True,
                 'skip_download': True,
+                'remote_components': 'ejs:github',
+                'extractor_args': {
+                    'youtube': {
+                        'player_client': ['tv_embedded'],
+                    }
+                }
             }
             
             # Add cookies file if exists using centralized cookie manager
@@ -200,6 +212,12 @@ class YouTubeDownloader(BaseDownloader):
                         'quiet': True,
                         'no_warnings': True,
                         'outtmpl': os.path.join(settings.MEDIA_FOLDER, f'{video_id}_audio.%(ext)s'),
+                        'remote_components': 'ejs:github',
+                        'extractor_args': {
+                            'youtube': {
+                                'player_client': ['tv_embedded'],
+                            }
+                        }
                     }
                 })
             else:
@@ -225,6 +243,12 @@ class YouTubeDownloader(BaseDownloader):
                         'no_warnings': True,
                         'merge_output_format': 'mp4',
                         'outtmpl': os.path.join(settings.MEDIA_FOLDER, f'{video_id}.%(ext)s'),
+                        'remote_components': 'ejs:github',
+                        'extractor_args': {
+                            'youtube': {
+                                'player_client': ['tv_embedded'],
+                            }
+                        }
                     }
                 })
                 
@@ -236,6 +260,12 @@ class YouTubeDownloader(BaseDownloader):
                         'quiet': True,
                         'no_warnings': True,
                         'outtmpl': os.path.join(settings.MEDIA_FOLDER, f'{video_id}_audio.%(ext)s'),
+                        'remote_components': 'ejs:github',
+                        'extractor_args': {
+                            'youtube': {
+                                'player_client': ['tv_embedded'],
+                            }
+                        }
                     }
                 })
             
