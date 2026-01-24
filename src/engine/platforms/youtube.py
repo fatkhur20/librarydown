@@ -204,21 +204,31 @@ class YouTubeDownloader(BaseDownloader):
                 })
             else:
                 # Download both video and audio
-                max_height = int(quality.replace('p', '')) if quality else 720
+                max_height = int(quality.replace('p', '')) if quality and quality != 'auto' else 9999
                 
-                # 1. Video with audio merged
+                # 1. Video with audio merged - with multiple fallback options
+                # Try specific height first, then fallback to best available
+                format_string = (
+                    f'bestvideo[height<={max_height}][ext=mp4]+bestaudio[ext=m4a]/'
+                    f'bestvideo[height<={max_height}]+bestaudio/'
+                    f'best[height<={max_height}]/'
+                    f'bestvideo[ext=mp4]+bestaudio[ext=m4a]/'
+                    f'bestvideo+bestaudio/'
+                    f'best'
+                )
+                
                 downloads.append({
                     'type': 'video',
                     'opts': {
-                        'format': f'bestvideo[height<={max_height}][ext=mp4]+bestaudio[ext=m4a]/best[height<={max_height}]/best',
+                        'format': format_string,
                         'quiet': True,
                         'no_warnings': True,
                         'merge_output_format': 'mp4',
-                        'outtmpl': os.path.join(settings.MEDIA_FOLDER, f'{video_id}_%(height)sp.%(ext)s'),
+                        'outtmpl': os.path.join(settings.MEDIA_FOLDER, f'{video_id}.%(ext)s'),
                     }
                 })
                 
-                # 2. Audio-only
+                # 2. Audio-only with fallback
                 downloads.append({
                     'type': 'audio',
                     'opts': {
@@ -245,22 +255,26 @@ class YouTubeDownloader(BaseDownloader):
             # Build response with all downloaded files
             media_data = []
             
-            # Check for video file
+            # Check for video file (now with simpler filename pattern)
             if not is_audio_only:
-                # Find the video file
-                for possible_height in [max_height, max_height - 10, max_height + 10]:  # Check nearby heights
-                    video_filename = f"{video_id}_{possible_height}p.mp4"
+                # Try to find video file with various extensions
+                for ext in ['mp4', 'webm', 'mkv']:
+                    video_filename = f"{video_id}.{ext}"
                     video_filepath = os.path.join(settings.MEDIA_FOLDER, video_filename)
                     if os.path.exists(video_filepath):
                         file_size_mb = os.path.getsize(video_filepath) / (1024 * 1024)
                         logger.info(f"[{self.platform}] Video download complete: {file_size_mb:.2f} MB")
+                        
+                        # Try to detect actual quality from file metadata if possible
+                        actual_quality = quality if quality else "best"
+                        
                         media_data.append({
-                            'quality': f"{possible_height}p",
+                            'quality': actual_quality,
                             'format_id': 'video+audio',
-                            'ext': 'mp4',
+                            'ext': ext,
                             'url': f"{settings.API_BASE_URL}/{settings.MEDIA_FOLDER}/{video_filename}",
                             'downloaded': True,
-                            'height': possible_height,
+                            'height': max_height if max_height != 9999 else None,
                             'type': 'video'
                         })
                         break
