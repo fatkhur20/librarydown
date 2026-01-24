@@ -38,7 +38,11 @@ from src.core.config import settings
 
 class LibraryDownBot:
     def __init__(self):
+        # Check if token is properly configured
         self.token = os.getenv("TELEGRAM_BOT_TOKEN")
+        if not self.token or self.token == "your_bot_token_here" or len(self.token) < 10:
+            raise ValueError("TELEGRAM_BOT_TOKEN environment variable not properly set. Please configure via environment variables.")
+        
         self.user_id = os.getenv("TELEGRAM_USER_ID")
         self.media_folder = settings.MEDIA_FOLDER
         
@@ -293,23 +297,33 @@ Enjoy downloading! 🚀
             await self.application.shutdown()
 
 
-# Global bot instance
-# bot = LibraryDownBot()
-
-
 def main():
     """Main function to run the bot."""
     # Check if required environment variables are set
-    if not os.getenv("TELEGRAM_BOT_TOKEN"):
-        print("❌ TELEGRAM_BOT_TOKEN environment variable not set!")
+    bot_token = os.getenv("TELEGRAM_BOT_TOKEN")
+    if not bot_token or bot_token == "your_bot_token_here" or len(bot_token) < 10:
+        print("❌ ERROR: TELEGRAM_BOT_TOKEN environment variable not properly set!")
+        print("💡 SOLUTION:")
+        print("   1. Get a bot token from @BotFather on Telegram")
+        print("   2. Set the environment variable:")
+        print("      export TELEGRAM_BOT_TOKEN='your_actual_token_here'")
+        print("      export TELEGRAM_USER_ID='your_user_id_here'")
+        print("   3. Run the bot again")
         return
     
     if not os.getenv("TELEGRAM_USER_ID"):
-        print("⚠️ TELEGRAM_USER_ID environment variable not set (optional for single-user mode)")
+        print("⚠️  WARNING: TELEGRAM_USER_ID environment variable not set (optional for single-user mode)")
     
-    # Initialize and run the bot
-    bot = LibraryDownBot()
-    asyncio.run(bot.run())
+    try:
+        # Initialize and run the bot
+        bot = LibraryDownBot()
+        asyncio.run(bot.run())
+    except ValueError as e:
+        print(f"❌ Configuration Error: {e}")
+        print("💡 Please check your environment variables and try again.")
+    except Exception as e:
+        print(f"❌ Bot failed to start: {e}")
+        print("💡 Make sure your bot token is valid and network connection is available.")
 
 
 if __name__ == "__main__":
