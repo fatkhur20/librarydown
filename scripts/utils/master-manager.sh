@@ -152,11 +152,13 @@ install_services() {
 start_services() {
     echo "[STARTING] All services..."
     
-    # Check if systemd is available (not available in Termux)
-    if command -v systemctl >/dev/null 2>&1; then
-        # Systemd environment
-        echo "Starting Redis..."
-        sudo systemctl start redis-server
+    # Check if LibraryDown systemd services are installed
+    if command -v systemctl >/dev/null 2>&1 && [ -f "/etc/systemd/system/librarydown-api.service" ]; then
+        # Systemd environment with installed services
+        echo "Starting Redis (if available)..."
+        if systemctl list-unit-files | grep -q redis; then
+            sudo systemctl start redis 2>/dev/null || sudo systemctl start redis-server 2>/dev/null || echo "[INFO] Redis not installed via systemd, will start manually if available"
+        fi
         
         # Start API Checker if available
         if [ -f "/etc/systemd/system/apichecker-api.service" ]; then
@@ -178,22 +180,26 @@ start_services() {
         echo ""
         echo "[SUCCESS] All services started via systemd!"
     else
-        # Termux environment - start manually
-        echo "[INFO] Termux environment detected - starting services manually"
+        # Manual mode - start with nohup
+        echo "[INFO] Starting services in manual mode (systemd services not installed)"
         start_services_manual
     fi
 }
 
 start_services_manual() {
-    echo "[STARTING] All services in manual mode (for Termux)..."
+    echo "[STARTING] All services in manual mode..."
     
     # Start Redis if available
     if command -v redis-server >/dev/null 2>&1; then
         echo "Starting Redis (if not running)..."
         if ! pgrep -f redis-server > /dev/null; then
-            redis-server > /dev/null 2>&1 &
+            nohup redis-server > /dev/null 2>&1 &
             sleep 1
+        else
+            echo "[INFO] Redis already running"
         fi
+    else
+        echo "[INFO] Redis not installed, skipping..."
     fi
     
     # Start API Checker if directory exists
@@ -223,32 +229,43 @@ start_services_manual() {
             source venv/bin/activate
         fi
         pkill -f "uvicorn.*8001" 2>/dev/null || true
-        nohup uvicorn src.api.main:app --host 0.0.0.0 --port 8001 --workers 1 > /root/librarydown/api_server.log 2>&1 &
+        nohup uvicorn src.main:app --host 0.0.0.0 --port 8001 --workers 2 > /root/librarydown/api_server.log 2>&1 &
+        sleep 2
     else
         echo "[SKIPPED] LibraryDown API due to port conflict"
     fi
     
-    # Start LibraryDown Worker
-    echo "Starting LibraryDown Worker in background..."
-    cd /root/librarydown
-    if [ -d "venv" ]; then
-        source venv/bin/activate
+    # Start LibraryDown Worker (optional - only if Celery is configured)
+    if grep -q "CELERY_BROKER_URL" /root/librarydown/.env 2>/dev/null; then
+        echo "Starting LibraryDown Worker in background..."
+        cd /root/librarydown
+        if [ -d "venv" ]; then
+            source venv/bin/activate
+        fi
+        pkill -f "celery.*worker" 2>/dev/null || true
+        nohup celery -A src.workers.celery_app worker --loglevel=info --concurrency=1 > /root/librarydown/worker.log 2>&1 &
+    else
+        echo "[INFO] Celery not configured, skipping worker..."
     fi
-    pkill -f "celery.*worker" 2>/dev/null || true
-    nohup celery -A src.workers.celery_app worker --loglevel=info --concurrency=1 > /root/librarydown/worker.log 2>&1 &
     
-    # Start Telegram Bot with monitor
+    # Start Telegram Bot
     echo "Starting LibraryDown Telegram Bot in background..."
     cd /root/librarydown
     if [ -d "venv" ]; then
         source venv/bin/activate
     fi
-    pkill -f "bot_monitor.sh" 2>/dev/null || true
-    nohup bash bot_monitor.sh > /root/librarydown/bot_startup.log 2>&1 &
+    pkill -f "bot_downloader.py" 2>/dev/null || true
+    nohup python3 src/bot_downloader.py > /root/librarydown/bot.log 2>&1 &
     
     sleep 3
     
-    echo "[SUCCESS] Services started in manual mode (conflict-checked)!"
+    echo ""
+    echo "[SUCCESS] Services started in manual mode!"
+    echo ""
+    echo "Log files:"
+    echo "  - API: /root/librarydown/api_server.log"
+    echo "  - Bot: /root/librarydown/bot.log"
+    echo "  - Worker: /root/librarydown/worker.log"
 }
 
 # Stop services
