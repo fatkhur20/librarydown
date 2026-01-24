@@ -5,8 +5,8 @@ Proxy Configuration for LibraryDown
 class ProxyConfig:
     """Configuration class for proxy settings"""
     
-    # Proxy settings - Enable tinyproxy
-    USE_PROXY = True  # Set to True when proxy is configured and running
+    # Proxy settings - Disable proxy by default
+    USE_PROXY = False  # Set to True when proxy is configured and running
     PROXY_TYPE = "http"  # socks5, http, https
     PROXY_HOST = "127.0.0.1"
     PROXY_PORT = 8888  # Default Tor port, change to 2080 for 3proxy, 8888 for tinyproxy
@@ -26,7 +26,7 @@ class ProxyConfig:
     
     # Platform-specific proxy settings
     PLATFORM_USE_PROXY = {
-        'youtube': True,
+        'youtube': False,    # Set to True when proxy is needed
         'instagram': False,  # Instagram usually works without proxy
         'tiktok': False,
         'twitter': False

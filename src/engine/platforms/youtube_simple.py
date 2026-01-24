@@ -1,3 +1,8 @@
+"""
+Simplified YouTube Downloader without Proxy Dependencies
+This version focuses on core yt-dlp functionality without proxy requirements
+"""
+
 from typing import Any, Dict, Optional
 import json
 import os
