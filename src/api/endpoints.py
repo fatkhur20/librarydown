@@ -527,27 +527,33 @@ async def health_check():
     Simple health check endpoint for monitoring.
     Returns 200 OK if service is running properly.
     """
-    if monitoring_settings.MONITORING_ENABLED:
-        system_stats = monitor.get_system_stats()
-        return {
-            "status": "healthy",
-            "service": settings.APP_NAME,
-            "version": settings.VERSION,
-            "timestamp": datetime.utcnow().isoformat(),
-            "system_stats": {
-                "cpu_percent": system_stats.get("cpu_percent"),
-                "memory_percent": system_stats.get("memory_percent"),
-                "disk_usage": system_stats.get("disk_usage"),
-                "uptime_seconds": system_stats.get("uptime_seconds")
-            }
-        }
-    else:
-        return {
+    try:
+        from src.core.config import settings
+        
+        response = {
             "status": "healthy",
             "service": settings.APP_NAME,
             "version": settings.VERSION,
             "timestamp": datetime.utcnow().isoformat()
         }
+        
+        if monitoring_settings.MONITORING_ENABLED:
+            try:
+                system_stats = monitor.get_system_stats()
+                response["system_stats"] = {
+                    "cpu_percent": system_stats.get("cpu_percent"),
+                    "memory_percent": system_stats.get("memory_percent"),
+                    "disk_usage": system_stats.get("disk_usage"),
+                    "uptime_seconds": system_stats.get("uptime_seconds")
+                }
+            except Exception as e:
+                logger.warning(f"Failed to get system stats for health check: {e}")
+                response["system_stats"] = "unavailable"
+        
+        return response
+    except Exception as e:
+        logger.error(f"Health check failed: {e}")
+        return {"status": "unhealthy", "error": str(e)}
 
 @router.get("/metrics", summary="System metrics")
 async def get_metrics(db: Session = Depends(get_db)):

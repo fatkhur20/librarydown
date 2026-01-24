@@ -147,5 +147,6 @@ class VersionChecker:
             return {"error": str(e)}
 
 
-# Global version checker instance - initialized later
-version_checker = None
+# Global version checker instance
+from src.core.config import settings
+version_checker = VersionChecker(current_version=settings.VERSION)
