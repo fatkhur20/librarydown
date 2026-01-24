@@ -5,6 +5,8 @@ from urllib.parse import urlparse
 from typing import Optional, List, Dict, Any
 import ipaddress
 from loguru import logger
+from src.utils.security_enhancer import security_enhancer
+from src.utils.firewall import firewall
 
 
 class SecurityValidator:
@@ -198,6 +200,60 @@ class SecurityValidator:
             'Strict-Transport-Security': 'max-age=31536000; includeSubDomains',
             'Content-Security-Policy': "default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data: https:; font-src 'self'",
             'Referrer-Policy': 'strict-origin-when-cross-origin'
+        }
+    
+    @classmethod
+    def validate_and_secure_request(cls, ip: str, endpoint: str, method: str = "GET") -> tuple[bool, str]:
+        """Validate and secure request using firewall and rate limiting."""
+        # Check with firewall
+        allowed, reason = firewall.check_request(ip, endpoint, method)
+        if not allowed:
+            return False, reason
+        
+        # Check rate limits
+        is_allowed, remaining = security_enhancer.check_rate_limit(
+            f"{ip}:{endpoint}", 
+            limit=20,  # Higher limit for secured requests
+            window=60
+        )
+        
+        if not is_allowed:
+            return False, f"Rate limit exceeded for {ip} on {endpoint}"
+        
+        return True, "Request validated and secured"
+    
+    @classmethod
+    def encrypt_sensitive_data(cls, data: str) -> str:
+        """Encrypt sensitive data using security enhancer."""
+        return security_enhancer.encrypt_data(data)
+    
+    @classmethod
+    def decrypt_sensitive_data(cls, encrypted_data: str) -> Optional[str]:
+        """Decrypt sensitive data using security enhancer."""
+        return security_enhancer.decrypt_data(encrypted_data)
+    
+    @classmethod
+    def validate_input_comprehensive(cls, input_str: str, pattern: str = None) -> bool:
+        """Comprehensive input validation using security enhancer."""
+        return security_enhancer.validate_input(input_str, pattern)
+    
+    @classmethod
+    def block_ip_address(cls, ip: str, duration: int = 3600, reason: str = "Security violation"):
+        """Block IP address using security enhancer and firewall."""
+        security_enhancer.block_ip(ip, duration)
+        firewall.block_ip(ip, reason)
+        logger.warning(f"IP {ip} blocked due to: {reason}")
+    
+    @classmethod
+    def get_security_report(cls) -> Dict[str, Any]:
+        """Get comprehensive security report."""
+        security_report = security_enhancer.get_security_report()
+        firewall_stats = firewall.get_firewall_stats()
+        
+        return {
+            "security_enhancer": security_report,
+            "firewall": firewall_stats,
+            "timestamp": security_report.get("timestamp") or firewall_stats.get("timestamp")
         }
 
 

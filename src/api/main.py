@@ -8,6 +8,9 @@ from src.core.config import settings
 from src.api.endpoints import router as api_router
 from src.database.base import engine, Base
 from loguru import logger
+from src.utils.logging.monitor import monitor
+from src.config.monitoring_config import monitoring_settings
+from src.utils.version_checker import VersionChecker
 import os
 
 # Create media directory if it doesn't exist
@@ -49,13 +52,31 @@ app.include_router(api_router, prefix=settings.API_V1_STR)
 
 @app.on_event("startup")
 async def startup_event():
+    global version_checker
     logger.info(f"{settings.APP_NAME} v{settings.VERSION} is starting...")
     logger.info(f"Debug mode: {settings.DEBUG}")
     logger.info(f"Rate limit: {settings.RATE_LIMIT_PER_MINUTE} requests/minute")
+    
+    # Initialize version checker
+    from src.utils.version_checker import VersionChecker
+    version_checker = VersionChecker(current_version=settings.VERSION)
+    
+    # Start monitoring if enabled
+    if monitoring_settings.MONITORING_ENABLED:
+        monitor.start_monitoring(monitoring_settings.MONITORING_INTERVAL)
+        logger.info(f"System monitoring started with interval {monitoring_settings.MONITORING_INTERVAL}s")
+        # Log initial system stats
+        initial_stats = monitor.get_system_stats()
+        logger.info(f"Initial system stats - CPU: {initial_stats.get('cpu_percent')}%, Memory: {initial_stats.get('memory_percent')}%, Disk: {initial_stats.get('disk_usage')}%")
 
 @app.on_event("shutdown")
 async def shutdown_event():
     logger.info(f"{settings.APP_NAME} is shutting down...")
+    
+    # Stop monitoring if enabled
+    if monitoring_settings.MONITORING_ENABLED:
+        monitor.stop_monitoring()
+        logger.info("System monitoring stopped")
 
 @app.get("/", tags=["Root"])
 async def read_root():

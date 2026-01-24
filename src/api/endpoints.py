@@ -16,6 +16,11 @@ import asyncio
 import tempfile
 import os
 from fastapi.responses import FileResponse
+from src.utils.logging.logger import log_api_call, log_download_event, log_error
+from src.utils.logging.monitor import monitor
+from src.config.monitoring_config import monitoring_settings
+from src.utils.version_checker import version_checker
+from src.utils.user_features import QualityOption, FormatOption, quality_selector, format_converter, playlist_handler, user_preferences
 
 router = APIRouter()
 limiter = Limiter(key_func=get_remote_address)
@@ -65,13 +70,25 @@ async def create_download_task_post(
     }
     ```
     """
+    start_time = datetime.utcnow()
+    client_ip = request.client.host if request.client else None
+    user_agent = request.headers.get("user-agent")
+    
+    log_api_call("/api/v1/download", "POST", client_ip, 200)
+    
     if not download_request.url:
+        log_error("Missing URL in download request", context={"client_ip": client_ip})
         raise HTTPException(status_code=400, detail="URL is required")
     
     url = str(download_request.url)
     platform = detect_platform(url)
     
     if platform == "unknown":
+        log_error(f"Unsupported platform detected: {url}", context={
+            "client_ip": client_ip,
+            "platform": platform,
+            "user_agent": user_agent
+        })
         raise HTTPException(
             status_code=400,
             detail="Unsupported platform. Supported: TikTok, YouTube, Instagram, Reddit, SoundCloud, Dailymotion, Twitch, Vimeo, Facebook, Bilibili, LinkedIn, Pinterest"
@@ -83,8 +100,8 @@ async def create_download_task_post(
         url=url,
         platform=PlatformType[platform.upper()],
         status=TaskStatus.PENDING,
-        ip_address=request.client.host if request.client else None,
-        user_agent=request.headers.get("user-agent")
+        ip_address=client_ip,
+        user_agent=user_agent
     )
     
     try:
@@ -96,7 +113,9 @@ async def create_download_task_post(
         db.add(history)
         db.commit()
         
-        logger.info(f"[API] Created download task {task.id} for {platform}: {url} (quality: {download_request.quality})")
+        duration = (datetime.utcnow() - start_time).total_seconds() * 1000  # Convert to milliseconds
+        logger.info(f"[API] Created download task {task.id} for {platform}: {url} (quality: {download_request.quality}) took {duration:.2f}ms")
+        log_download_event(url, client_ip, "QUEUED", duration=duration)
         
         return {
             "task_id": task.id,
@@ -106,7 +125,10 @@ async def create_download_task_post(
         
     except Exception as e:
         db.rollback()
+        duration = (datetime.utcnow() - start_time).total_seconds() * 1000  # Convert to milliseconds
         logger.error(f"[API] Failed to create download task: {e}")
+        log_error(f"Failed to create download task: {e}", exception=e, 
+                  context={"url": url, "client_ip": client_ip, "duration_ms": duration})
         raise HTTPException(status_code=500, detail=f"Failed to queue download: {str(e)}")
 
 @router.get("/download", response_model=DownloadResponse, summary="Submit a URL via GET request")
@@ -126,10 +148,21 @@ async def create_download_task_get(
     - Video: "144p", "240p", "360p", "480p", "720p", "1080p" (default: "720p")
     - Audio: "audio" - Download audio-only format (M4A, YouTube only)
     """
+    start_time = datetime.utcnow()
+    client_ip = request.client.host if request.client else None
+    user_agent = request.headers.get("user-agent")
+    
+    log_api_call("/api/v1/download", "GET", client_ip, 200)
+    
     url_str = str(url)
     platform = detect_platform(url_str)
     
     if platform == "unknown":
+        log_error(f"Unsupported platform detected: {url_str}", context={
+            "client_ip": client_ip,
+            "platform": platform,
+            "user_agent": user_agent
+        })
         raise HTTPException(
             status_code=400,
             detail="Unsupported platform. Supported: TikTok, YouTube, Instagram, Reddit, SoundCloud, Dailymotion, Twitch, Vimeo, Facebook, Bilibili, LinkedIn, Pinterest"
@@ -141,8 +174,8 @@ async def create_download_task_get(
         url=url_str,
         platform=PlatformType[platform.upper()],
         status=TaskStatus.PENDING,
-        ip_address=request.client.host if request.client else None,
-        user_agent=request.headers.get("user-agent")
+        ip_address=client_ip,
+        user_agent=user_agent
     )
     
     try:
@@ -151,7 +184,9 @@ async def create_download_task_get(
         db.add(history)
         db.commit()
         
-        logger.info(f"[API] Created download task {task.id} for {platform}: {url_str} (quality: {quality})")
+        duration = (datetime.utcnow() - start_time).total_seconds() * 1000  # Convert to milliseconds
+        logger.info(f"[API] Created download task {task.id} for {platform}: {url_str} (quality: {quality}) took {duration:.2f}ms")
+        log_download_event(url_str, client_ip, "QUEUED", duration=duration)
         
         return {
             "task_id": task.id,
@@ -161,7 +196,10 @@ async def create_download_task_get(
         
     except Exception as e:
         db.rollback()
+        duration = (datetime.utcnow() - start_time).total_seconds() * 1000  # Convert to milliseconds
         logger.error(f"[API] Failed to create download task: {e}")
+        log_error(f"Failed to create download task: {e}", exception=e, 
+                  context={"url": url_str, "client_ip": client_ip, "duration_ms": duration})
         raise HTTPException(status_code=500, detail=f"Failed to queue download: {str(e)}")
 
 @router.get("/status/{task_id}", response_model=TaskStatusResponse)
@@ -170,6 +208,8 @@ async def get_task_status(task_id: str, db: Session = Depends(get_db)):
     Retrieves the status and result of a download task.
     Also updates the database with the latest status.
     """
+    start_time = datetime.utcnow()
+    
     task_result = AsyncResult(task_id, app=celery_app)
     
     try:
@@ -211,12 +251,18 @@ async def get_task_status(task_id: str, db: Session = Depends(get_db)):
             
             db.commit()
     
-    except ValueError:
+    except ValueError as e:
         status = "FAILURE"
         result = {
             "status": "FAILURE",
             "error": "Could not decode task result. The worker likely crashed."
         }
+        log_error(f"Could not decode task result: {e}", exception=e, 
+                  context={"task_id": task_id})
+    
+    duration = (datetime.utcnow() - start_time).total_seconds() * 1000  # Convert to milliseconds
+    logger.info(f"[API] Status check for task {task_id}: {status} took {duration:.2f}ms")
+    log_api_call(f"/api/v1/status/{task_id}", "GET", task_id, 200, duration)
     
     response = {
         "task_id": task_id,
@@ -275,6 +321,12 @@ async def download_sync(
     **Note:** This endpoint may take longer to respond as it waits for the download to complete.
     For large files or slow connections, the async endpoint might be preferred.
     """
+    start_time = datetime.utcnow()
+    client_ip = request.client.host if request.client else None
+    user_agent = request.headers.get("user-agent")
+    
+    log_api_call("/api/v1/download-sync", "GET", client_ip, 200)
+    
     from src.utils.security import security_validator
     
     url_str = str(url)
@@ -282,11 +334,20 @@ async def download_sync(
     # Validate URL security
     is_valid, error = security_validator.validate_url(url_str)
     if not is_valid:
+        log_error(f"Invalid URL provided: {url_str}", context={
+            "client_ip": client_ip,
+            "error": error
+        })
         raise HTTPException(status_code=400, detail=f"Invalid URL: {error}")
     
     platform = detect_platform(url_str)
     
     if platform == "unknown":
+        log_error(f"Unsupported platform detected: {url_str}", context={
+            "client_ip": client_ip,
+            "platform": platform,
+            "user_agent": user_agent
+        })
         raise HTTPException(
             status_code=400,
             detail="Unsupported platform. Supported: TikTok, YouTube, Instagram, Reddit, SoundCloud, Dailymotion, Twitch, Vimeo, Facebook, Bilibili, LinkedIn, Pinterest"
@@ -298,8 +359,8 @@ async def download_sync(
         url=url_str,
         platform=PlatformType[platform.upper()],
         status=TaskStatus.PENDING,
-        ip_address=request.client.host if request.client else None,
-        user_agent=request.headers.get("user-agent")
+        ip_address=client_ip,
+        user_agent=user_agent
     )
     
     try:
@@ -341,6 +402,11 @@ async def download_sync(
             from src.engine.platforms.pinterest import PinterestDownloader
             downloader = PinterestDownloader()
         else:
+            log_error(f"Sync download not implemented for platform: {platform}", context={
+                "client_ip": client_ip,
+                "platform": platform,
+                "url": url_str
+            })
             raise HTTPException(
                 status_code=400,
                 detail=f"Sync download not yet implemented for {platform}"
@@ -397,6 +463,10 @@ async def download_sync(
                 filename = os.path.basename(latest_file)
                 
                 logger.info(f"[API] Returning file: {latest_file}")
+                duration = (datetime.utcnow() - start_time).total_seconds() * 1000  # Convert to milliseconds
+                log_download_event(url_str, client_ip, "SUCCESS", 
+                                  file_size=os.path.getsize(latest_file) if os.path.exists(latest_file) else None,
+                                  duration=duration)
                 return FileResponse(
                     path=latest_file,
                     filename=filename,
@@ -413,6 +483,10 @@ async def download_sync(
                         
                         if os.path.exists(local_file_path):
                             logger.info(f"[API] Returning file: {local_file_path}")
+                            duration = (datetime.utcnow() - start_time).total_seconds() * 1000  # Convert to milliseconds
+                            log_download_event(url_str, client_ip, "SUCCESS", 
+                                              file_size=os.path.getsize(local_file_path) if os.path.exists(local_file_path) else None,
+                                              duration=duration)
                             return FileResponse(
                                 path=local_file_path,
                                 filename=filename,
@@ -421,6 +495,8 @@ async def download_sync(
         
         # If no file could be found/returned, return metadata
         logger.warning(f"[API] Could not find downloaded file, returning metadata instead")
+        duration = (datetime.utcnow() - start_time).total_seconds() * 1000  # Convert to milliseconds
+        log_download_event(url_str, client_ip, "PARTIAL_SUCCESS", duration=duration)
         return {
             "status": "completed",
             "platform": platform,
@@ -437,7 +513,11 @@ async def download_sync(
         db.add(history)
         db.commit()
         
+        duration = (datetime.utcnow() - start_time).total_seconds() * 1000  # Convert to milliseconds
         logger.error(f"[API] Sync download failed: {e}")
+        log_error(f"Sync download failed: {e}", exception=e, 
+                  context={"url": url_str, "client_ip": client_ip, "duration_ms": duration})
+        log_download_event(url_str, client_ip, "FAILED", duration=duration)
         raise HTTPException(status_code=500, detail=f"Sync download failed: {str(e)}")
 
 
@@ -447,18 +527,34 @@ async def health_check():
     Simple health check endpoint for monitoring.
     Returns 200 OK if service is running properly.
     """
-    return {
-        "status": "healthy",
-        "service": settings.APP_NAME,
-        "version": settings.VERSION,
-        "timestamp": datetime.utcnow().isoformat()
-    }
+    if monitoring_settings.MONITORING_ENABLED:
+        system_stats = monitor.get_system_stats()
+        return {
+            "status": "healthy",
+            "service": settings.APP_NAME,
+            "version": settings.VERSION,
+            "timestamp": datetime.utcnow().isoformat(),
+            "system_stats": {
+                "cpu_percent": system_stats.get("cpu_percent"),
+                "memory_percent": system_stats.get("memory_percent"),
+                "disk_usage": system_stats.get("disk_usage"),
+                "uptime_seconds": system_stats.get("uptime_seconds")
+            }
+        }
+    else:
+        return {
+            "status": "healthy",
+            "service": settings.APP_NAME,
+            "version": settings.VERSION,
+            "timestamp": datetime.utcnow().isoformat()
+        }
 
 @router.get("/metrics", summary="System metrics")
 async def get_metrics(db: Session = Depends(get_db)):
     """
     Get system metrics and statistics.
     """
+    start_time = datetime.utcnow()
     try:
         # Get download statistics
         total_downloads = db.query(DownloadHistory).count()
@@ -480,6 +576,14 @@ async def get_metrics(db: Session = Depends(get_db)):
         except ImportError:
             cache_stats = {"enabled": False}
         
+        # Get system stats if monitoring is enabled
+        system_stats = {}
+        if monitoring_settings.MONITORING_ENABLED:
+            system_stats = monitor.get_system_stats()
+        
+        duration = (datetime.utcnow() - start_time).total_seconds() * 1000  # Convert to milliseconds
+        log_api_call("/api/v1/metrics", "GET", "system", 200, duration)
+        
         return {
             "downloads": {
                 "total": total_downloads,
@@ -488,11 +592,221 @@ async def get_metrics(db: Session = Depends(get_db)):
                 "success_rate": round(successful_downloads/total_downloads*100, 2) if total_downloads > 0 else 0
             },
             "cache": cache_stats,
-            "timestamp": datetime.utcnow().isoformat()
+            "system": system_stats,
+            "timestamp": datetime.utcnow().isoformat(),
+            "response_time_ms": duration
         }
     except Exception as e:
+        duration = (datetime.utcnow() - start_time).total_seconds() * 1000  # Convert to milliseconds
         logger.error(f"Metrics endpoint error: {e}")
+        log_error(f"Metrics endpoint error: {e}", exception=e, context={"duration_ms": duration})
         raise HTTPException(status_code=500, detail="Unable to fetch metrics")
+
+@router.get("/version", summary="Get version information")
+async def get_version_info():
+    """
+    Get current version and check for updates.
+    """
+    start_time = datetime.utcnow()
+    
+    try:
+        system_info = version_checker.get_system_info()
+        duration = (datetime.utcnow() - start_time).total_seconds() * 1000  # Convert to milliseconds
+        log_api_call("/api/v1/version", "GET", "system", 200, duration)
+        
+        return {
+            "version_info": system_info,
+            "timestamp": datetime.utcnow().isoformat(),
+            "response_time_ms": duration
+        }
+    except Exception as e:
+        duration = (datetime.utcnow() - start_time).total_seconds() * 1000  # Convert to milliseconds
+        logger.error(f"Version endpoint error: {e}")
+        log_error(f"Version endpoint error: {e}", exception=e, context={"duration_ms": duration})
+        raise HTTPException(status_code=500, detail="Unable to fetch version info")
+
+@router.post("/update", summary="Update the system")
+async def update_system(request: Request):
+    """
+    Update the system to the latest version.
+    """
+    client_ip = request.client.host if request.client else None
+    start_time = datetime.utcnow()
+    
+    log_api_call("/api/v1/update", "POST", client_ip, 200)
+    
+    try:
+        # Check if update is available first
+        update_available, latest_version, update_msg = version_checker.is_update_available()
+        
+        if not update_available:
+            duration = (datetime.utcnow() - start_time).total_seconds() * 1000
+            logger.info(f"No update needed: {update_msg}")
+            return {
+                "status": "no_update_needed",
+                "message": update_msg,
+                "latest_version": latest_version,
+                "timestamp": datetime.utcnow().isoformat(),
+                "response_time_ms": duration
+            }
+        
+        # Perform update
+        success, message = version_checker.update_system()
+        
+        duration = (datetime.utcnow() - start_time).total_seconds() * 1000
+        if success:
+            logger.info(f"Update completed: {message}")
+            log_api_call("/api/v1/update", "POST", client_ip, 200, duration)
+            return {
+                "status": "updated",
+                "message": message,
+                "previous_version": version_checker.current_version,
+                "timestamp": datetime.utcnow().isoformat(),
+                "response_time_ms": duration
+            }
+        else:
+            logger.error(f"Update failed: {message}")
+            log_error(f"Update failed: {message}", context={"client_ip": client_ip, "duration_ms": duration})
+            return {
+                "status": "failed",
+                "message": message,
+                "timestamp": datetime.utcnow().isoformat(),
+                "response_time_ms": duration
+            }
+    except Exception as e:
+        duration = (datetime.utcnow() - start_time).total_seconds() * 1000  # Convert to milliseconds
+        logger.error(f"Update endpoint error: {e}")
+        log_error(f"Update endpoint error: {e}", exception=e, context={"client_ip": client_ip, "duration_ms": duration})
+        raise HTTPException(status_code=500, detail="Unable to perform update")
+
+@router.get("/qualities", summary="Get available quality options")
+async def get_quality_options(platform: Optional[str] = None):
+    """
+    Get available quality options for a platform.
+    If no platform is specified, returns all available options.
+    """
+    start_time = datetime.utcnow()
+    
+    try:
+        if platform:
+            qualities = quality_selector.get_quality_options(platform)
+            result = {
+                "platform": platform,
+                "qualities": [q.value for q in qualities],
+                "timestamp": datetime.utcnow().isoformat()
+            }
+        else:
+            result = {
+                "all_qualities": [q.value for q in QualityOption],
+                "timestamp": datetime.utcnow().isoformat()
+            }
+        
+        duration = (datetime.utcnow() - start_time).total_seconds() * 1000
+        log_api_call("/api/v1/qualities", "GET", "system", 200, duration)
+        return result
+    except Exception as e:
+        duration = (datetime.utcnow() - start_time).total_seconds() * 1000
+        logger.error(f"Qualities endpoint error: {e}")
+        log_error(f"Qualities endpoint error: {e}", exception=e, context={"duration_ms": duration})
+        raise HTTPException(status_code=500, detail="Unable to fetch quality options")
+
+@router.post("/convert", summary="Convert media format")
+async def convert_media(
+    input_file: str,
+    target_format: FormatOption
+):
+    """
+    Convert media file to target format.
+    Input file should be a path to an existing file in the media folder.
+    """
+    start_time = datetime.utcnow()
+    
+    try:
+        # Validate input file path to prevent directory traversal
+        is_valid, error = security_validator.validate_media_path(settings.MEDIA_FOLDER, input_file)
+        if not is_valid:
+            raise HTTPException(status_code=400, detail=error)
+        
+        input_path = os.path.join(settings.MEDIA_FOLDER, input_file)
+        if not os.path.exists(input_path):
+            raise HTTPException(status_code=404, detail="Input file not found")
+        
+        # Generate output filename
+        file_base, file_ext = os.path.splitext(input_path)
+        output_path = f"{file_base}.{target_format.value}"
+        
+        # Perform conversion
+        success = format_converter.convert_file(input_path, output_path, target_format)
+        
+        if success:
+            duration = (datetime.utcnow() - start_time).total_seconds() * 1000
+            log_api_call("/api/v1/convert", "POST", "system", 200, duration)
+            return {
+                "status": "converted",
+                "input_file": input_file,
+                "output_file": os.path.basename(output_path),
+                "target_format": target_format.value,
+                "timestamp": datetime.utcnow().isoformat(),
+                "response_time_ms": duration
+            }
+        else:
+            raise HTTPException(status_code=500, detail="Conversion failed")
+    except Exception as e:
+        duration = (datetime.utcnow() - start_time).total_seconds() * 1000
+        logger.error(f"Media conversion error: {e}")
+        log_error(f"Media conversion error: {e}", exception=e, context={"duration_ms": duration})
+        raise HTTPException(status_code=500, detail=f"Conversion failed: {str(e)}")
+
+@router.get("/playlist-info", summary="Get playlist information")
+async def get_playlist_info(url: HttpUrl):
+    """
+    Get information about a playlist.
+    """
+    start_time = datetime.utcnow()
+    
+    try:
+        url_str = str(url)
+        playlist_info = playlist_handler.get_playlist_info(url_str)
+        
+        if playlist_info:
+            duration = (datetime.utcnow() - start_time).total_seconds() * 1000
+            log_api_call("/api/v1/playlist-info", "GET", "system", 200, duration)
+            return {
+                "playlist": playlist_info.dict(),
+                "timestamp": datetime.utcnow().isoformat(),
+                "response_time_ms": duration
+            }
+        else:
+            raise HTTPException(status_code=400, detail="URL is not a playlist or could not be processed")
+    except Exception as e:
+        duration = (datetime.utcnow() - start_time).total_seconds() * 1000
+        logger.error(f"Playlist info error: {e}")
+        log_error(f"Playlist info error: {e}", exception=e, context={"duration_ms": duration})
+        raise HTTPException(status_code=500, detail=f"Could not get playlist info: {str(e)}")
+
+@router.get("/preferences", summary="Get user preferences")
+async def get_user_preferences():
+    """
+    Get current user preferences.
+    """
+    start_time = datetime.utcnow()
+    
+    try:
+        prefs = user_preferences.get_user_quality_options()
+        duration = (datetime.utcnow() - start_time).total_seconds() * 1000
+        log_api_call("/api/v1/preferences", "GET", "system", 200, duration)
+        return {
+            "preferences": prefs,
+            "timestamp": datetime.utcnow().isoformat(),
+            "response_time_ms": duration
+        }
+    except Exception as e:
+        duration = (datetime.utcnow() - start_time).total_seconds() * 1000
+        logger.error(f"User preferences error: {e}")
+        log_error(f"User preferences error: {e}", exception=e, context={"duration_ms": duration})
+        raise HTTPException(status_code=500, detail="Unable to fetch user preferences")
+
+@router.get("/formats", response_model=FormatsResponse, summary="Get available video formats")
 @limiter.limit("20/minute")
 async def get_video_formats(
     request: Request,
