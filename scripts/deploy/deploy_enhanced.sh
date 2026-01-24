@@ -310,7 +310,7 @@ CELERY_WORKER_PID=$!
 celery -A src.workers.celery_app beat --loglevel=info &
 CELERY_BEAT_PID=$!
 
-uvicorn src.api.main:app --host 0.0.0.0 --port 8000 &
+uvicorn src.main:app --host 0.0.0.0 --port 8000 &
 API_PID=$!
 
 echo "Services started:"
@@ -334,7 +334,7 @@ echo "Stopping LibraryDown services..."
 # Kill processes by name
 pkill -f "celery.*worker"
 pkill -f "celery.*beat"  
-pkill -f "uvicorn.*src.api.main"
+pkill -f "uvicorn.*src.main"
 
 echo "Services stopped"
 EOF
@@ -371,8 +371,8 @@ else
 fi
 
 echo "API Server:"
-if pgrep -f "uvicorn.*src.api.main" > /dev/null; then
-    echo "  ✓ Running (PID: $(pgrep -f "uvicorn.*src.api.main"))"
+if pgrep -f "uvicorn.*src.main" > /dev/null; then
+    echo "  ✓ Running (PID: $(pgrep -f "uvicorn.*src.main"))"
     echo "  Available at: http://localhost:8000"
 else
     echo "  ✗ Not running"
