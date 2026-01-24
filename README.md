@@ -26,6 +26,7 @@
 - 🛡️ **Secure**: Rate limiting dan CORS protection
 - 🧹 **Auto-cleanup**: File otomatis dihapus setelah TTL expired
 - 📱 **Multi-platform**: Support TikTok, YouTube, Instagram, Twitter/X
+- 🤖 **Telegram Bot**: Download langsung lewat bot Telegram (NEW!)
 
 ---
 
@@ -37,38 +38,31 @@
   - Video dan carousel/slideshow images
   - Metadata lengkap (caption, stats, author info)
   - Music/audio extraction
-  
+
 - **YouTube Downloader** (Implemented)
   - Video dengan berbagai quality options
   - Metadata dan statistics
-  
+
+- **Telegram Bot Downloader** (NEW!) 🤖
+  - Download langsung dari bot Telegram
+  - Support semua platform yang didukung
+  - Interface interaktif dengan command
+  - Single-step download (tanpa perlu polling)
+  - Direct file delivery to chat
+
 - **REST API**
   - FastAPI dengan automatic Swagger documentation
   - Rate limiting (10 req/min default)
   - CORS middleware
-  
+
 - **Task Management**
   - Asynchronous processing dengan Celery
   - Auto-retry dengan exponential backoff
   - Progress tracking
-  
-- **Database Tracking**
-  - SQLite untuk download history
-  - Full metadata storage
-  - Query dan filtering support
-  
+
 - **File Management**
   - Auto-cleanup dengan configurable TTL
   - Scheduled cleanup task (Celery Beat)
-
-### ⚠️ Coming Soon
-
-- **Instagram Downloader** (Placeholder - requires advanced scraping)
-- **Twitter/X Downloader** (Placeholder - requires API credentials)
-- Web UI untuk easy access
-- Batch download support
-- Video quality selection
-- Authentication system (optional)
 
 ---
 
@@ -79,6 +73,7 @@
 - Python 3.13+
 - Redis server
 - Git
+- FFmpeg (for media processing)
 
 ### Quick Start
 
@@ -114,27 +109,6 @@ The new management system provides additional features:
 - Environment auto-detection (systemd vs Termux)
 - Comprehensive service management
 
-### Management System
-
-LibraryDown now includes a comprehensive management system:
-
-```bash
-# Master management suite
-./master-manager.sh [command]
-
-# Quick shortcuts
-./setup.sh      # Full installation
-./update.sh     # Update and restart
-./restart.sh    # Restart services
-
-# Examples:
-./master-manager.sh start      # Start all services
-./master-manager.sh status     # Check service status
-./master-manager.sh bot-config # Configure Telegram bot
-./master-manager.sh monitor    # Monitor services
-./master-manager.sh backup     # Backup configuration
-```
-
 3. **Activate virtual environment**
 
 ```bash
@@ -149,32 +123,23 @@ Edit `.env` sesuai kebutuhan:
 nano .env
 ```
 
-### Manual Installation
+### Telegram Bot Configuration (NEW!)
 
-Jika prefer manual installation:
+To use the Telegram bot downloader:
+
+1. Create a bot with [@BotFather](https://t.me/BotFather) on Telegram
+2. Get the bot token
+3. Update your `.env` file:
 
 ```bash
-# Create virtual environment
-python3 -m venv venv
-source venv/bin/activate
+TELEGRAM_BOT_TOKEN=your_bot_token_here
+TELEGRAM_USER_ID=your_telegram_user_id
+```
 
-# Install dependencies
-pip install -r requirements.txt
+4. Start the bot:
 
-# Copy environment file
-cp .env.example .env
-
-# Create media folder
-mkdir -p media
-
-# Install and start Redis (if not installed)
-# Ubuntu/Debian:
-sudo apt-get install redis-server
-sudo systemctl start redis
-
-# macOS:
-brew install redis
-brew services start redis
+```bash
+./start_bot.sh
 ```
 
 ---
@@ -223,6 +188,29 @@ source venv/bin/activate
 uvicorn src.api.main:app --reload --host 0.0.0.0 --port 8000
 ```
 
+### Telegram Bot Usage (NEW!) 🤖
+
+After configuring and starting the bot:
+
+#### Commands:
+- `/start` - Welcome message and basic info
+- `/help` - Detailed help information
+- `/download` - Download a video (followed by URL)
+- `/status` - Check bot status
+
+#### Direct Usage:
+Just send a video URL directly to the bot, and it will automatically download and send the video back to you!
+
+#### Example:
+```
+https://www.youtube.com/watch?v=dQw4w9WgXcQ
+```
+
+The bot will:
+1. Recognize the platform (YouTube)
+2. Start the download
+3. Send the video file directly to your chat
+
 ### Menggunakan API
 
 Setelah semua services running, API akan tersedia di:
@@ -234,7 +222,7 @@ Setelah semua services running, API akan tersedia di:
 #### Example: Download TikTok Video
 
 ```bash
-# Submit download task
+# Submit download task (async)
 curl -X POST http://localhost:8000/api/v1/download \
   -H "Content-Type: application/json" \
   -d '{"url": "https://vt.tiktok.com/ZS593uwQc/"}'
@@ -252,6 +240,16 @@ curl http://localhost:8000/api/v1/status/abc123...
 # When status is SUCCESS, download URL akan tersedia di response
 ```
 
+#### Example: Direct Download (NEW!)
+
+```bash
+# One-step download (sync) - returns the file directly
+curl -O "http://localhost:8000/api/v1/download-sync?url=https://www.youtube.com/watch?v=dQw4w9WgXcQ&quality=720p"
+
+# For audio only:
+curl -O "http://localhost:8000/api/v1/download-sync?url=https://www.youtube.com/watch?v=dQw4w9WgXcQ&quality=audio"
+```
+
 Untuk dokumentasi API lengkap, lihat [API Documentation](docs/API.md).
 
 ---
@@ -263,8 +261,10 @@ librarydown/
 ├── src/
 │   ├── api/                    # FastAPI application
 │   │   ├── main.py            # App initialization, middleware
-│   │   ├── endpoints.py       # API routes
+│   │   ├── endpoints.py       # API routes (includes new /download-sync)
 │   │   └── schemas.py         # Pydantic models
+│   │
+│   ├── bot_downloader.py      # NEW! Telegram bot for direct downloads
 │   │
 │   ├── core/                   # Core configuration
 │   │   └── config.py          # Settings management
@@ -282,6 +282,13 @@ librarydown/
 │   │       ├── instagram.py   # Instagram (placeholder)
 │   │       └── twitter.py     # Twitter (placeholder)
 │   │
+│   ├── utils/                  # NEW! Shared utilities
+│   │   ├── security.py        # Security validation
+│   │   ├── cache.py           # Caching utilities
+│   │   ├── cookie_manager.py  # Cookie management
+│   │   ├── exceptions.py      # Custom exceptions
+│   │   └── url_validator.py   # URL validation
+│   │
 │   └── workers/                # Celery workers
 │       ├── celery_app.py      # Celery configuration
 │       ├── tasks.py           # Download tasks
@@ -296,8 +303,31 @@ librarydown/
 ├── .env.example               # Environment template
 ├── requirements.txt           # Python dependencies
 ├── setup.sh                   # Setup automation script
+├── start_bot.sh               # NEW! Telegram bot startup script
 └── README.md                  # This file
 ```
+
+---
+
+## 🤖 Telegram Bot Features (NEW!)
+
+### Bot Commands:
+- `/start` - Welcome message and basic usage info
+- `/help` - Detailed help with supported platforms
+- `/download <URL>` - Download a specific video
+- `/status` - Check bot status and statistics
+
+### Direct Usage:
+Simply send any supported video URL to the bot, and it will automatically:
+1. Detect the platform
+2. Start the download process
+3. Send the video file directly to your chat
+
+### Supported Platforms:
+All platforms supported by the API are also available through the bot:
+- YouTube, TikTok, Instagram, SoundCloud
+- Dailymotion, Twitch, Reddit, Vimeo
+- Facebook, Bilibili, LinkedIn, Pinterest
 
 ---
 
@@ -337,6 +367,13 @@ MAX_RETRIES=3                       # Retry attempts for failed tasks
 RETRY_BACKOFF=5                    # Exponential backoff base (seconds)
 ```
 
+### Telegram Bot Settings (NEW!)
+
+```bash
+TELEGRAM_BOT_TOKEN=your_bot_token_here    # Get from @BotFather
+TELEGRAM_USER_ID=your_user_id_here        # Your Telegram user ID
+```
+
 ---
 
 ## 🛠️ Development
@@ -364,32 +401,6 @@ flake8 src/
 mypy src/
 ```
 
-### Adding New Platform
-
-1. Create new downloader di `src/engine/platforms/`:
-
-```python
-from src.engine.base_downloader import BaseDownloader
-
-class NewPlatformDownloader(BaseDownloader):
-    @property
-    def platform(self) -> str:
-        return "newplatform"
-    
-    async def download(self, url: str) -> Dict[str, Any]:
-        # Implementation here
-        pass
-```
-
-2. Register di `src/workers/tasks.py`:
-
-```python
-def get_downloader(url: str):
-    # Add your platform detection
-    if "newplatform.com" in url_lower:
-        return NewPlatformDownloader()
-```
-
 ---
 
 ## 📊 Monitoring & Logs
@@ -411,6 +422,7 @@ Logs menggunakan **loguru**. Check console output dari:
 - FastAPI server (API requests)
 - Celery worker (task execution)
 - Celery beat (scheduled tasks)
+- Telegram bot (NEW!)
 
 ---
 
@@ -452,6 +464,7 @@ Project ini menggunakan MIT License. Lihat `LICENSE` file untuk details.
 - [Celery](https://docs.celeryq.dev/) - Distributed task queue
 - [httpx](https://www.python-httpx.org/) - Async HTTP client
 - [loguru](https://github.com/Delgan/loguru) - Simplified logging
+- [python-telegram-bot](https://python-telegram-bot.org/) - Telegram bot framework
 
 ---
 
