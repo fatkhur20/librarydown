@@ -26,7 +26,7 @@ class ProxyConfig:
     
     # Platform-specific proxy settings
     PLATFORM_USE_PROXY = {
-        'youtube': False,    # Set to True when proxy is needed
+        'youtube': True,    # Set to True when proxy is needed - YouTube often requires proxy to avoid bot detection
         'instagram': False,  # Instagram usually works without proxy
         'tiktok': False,
         'twitter': False

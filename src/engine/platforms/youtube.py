@@ -40,8 +40,30 @@ class YouTubeDownloader(BaseDownloader):
     
     def _get_realistic_headers(self):
         """Return realistic browser headers to mimic real browser"""
+        import random
+        
+        user_agents = [
+            'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+            'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+            'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+            'Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:121.0) Gecko/20100101 Firefox/121.0',
+            'Mozilla/5.0 (Macintosh; Intel Mac OS X 10.15; rv:121.0) Gecko/20100101 Firefox/121.0',
+            'Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:121.0) Gecko/20100101 Firefox/121.0',
+            'Mozilla/5.0 (iPhone; CPU iPhone OS 17_1_2 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.1.2 Mobile/15E148 Safari/604.1',
+            'Mozilla/5.0 (Android 13; Mobile; rv:121.0) Gecko/121.0 Firefox/121.0'
+        ]
+        
+        referers = [
+            'https://www.google.com/',
+            'https://www.google.co.uk/',
+            'https://www.bing.com/',
+            'https://www.youtube.com/',
+            'https://www.facebook.com/',
+            'https://www.twitter.com/',
+        ]
+        
         return {
-            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+            'User-Agent': random.choice(user_agents),
             'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,image/apng,*/*;q=0.8',
             'Accept-Language': 'en-US,en;q=0.9',
             'Accept-Encoding': 'gzip, deflate, br',
@@ -53,7 +75,7 @@ class YouTubeDownloader(BaseDownloader):
             'Sec-Fetch-User': '?1',
             'Cache-Control': 'max-age=0',
             'DNT': '1',
-            'Referer': 'https://www.google.com/',
+            'Referer': random.choice(referers),
         }
     
     async def get_formats(self, url: str) -> Dict[str, Any]:
@@ -78,10 +100,13 @@ class YouTubeDownloader(BaseDownloader):
                 'remote_components': 'ejs:github',  # Enable EJS for challenge solving
                 'extractor_args': {
                     'youtube': {
-                        'player_client': ['tv_embedded', 'web'],
+                        'player_client': ['android', 'web', 'ios', 'mweb', 'android_embedded', 'ios_embedded', 'web_embedded'],
+                        'player_skip': ['webpage', 'configs'],
                     }
                 },
-                'http_headers': self._get_realistic_headers()
+                'http_headers': self._get_realistic_headers(),
+                'sleep_interval_requests': 1.0,
+                'sleep_interval': 2
             }
             
             # Add cookies file if exists using centralized cookie manager
@@ -90,6 +115,14 @@ class YouTubeDownloader(BaseDownloader):
             
             if cookie_options:
                 logger.info(f"[{self.platform}] Using cookies for format detection")
+            
+            # Add proxy options if configured
+            from config.proxy_config import ProxyConfig
+            proxy_options = ProxyConfig.get_yt_dlp_proxy_options(self.platform)
+            ydl_opts.update(proxy_options)
+            
+            if proxy_options:
+                logger.info(f"[{self.platform}] Using proxy for format detection")
             
             # Add retry mechanism for captcha errors in format detection
             max_retries = 3
@@ -240,10 +273,13 @@ class YouTubeDownloader(BaseDownloader):
                 'remote_components': 'ejs:github',  # Enable EJS for challenge solving
                 'extractor_args': {
                     'youtube': {
-                        'player_client': ['tv_embedded', 'web'],
+                        'player_client': ['android', 'web', 'ios', 'mweb', 'android_embedded', 'ios_embedded', 'web_embedded'],
+                        'player_skip': ['webpage', 'configs'],
                     }
                 },
-                'http_headers': self._get_realistic_headers()
+                'http_headers': self._get_realistic_headers(),
+                'sleep_interval_requests': 1.0,
+                'sleep_interval': 2
             }
             
             # Add cookies file if exists using centralized cookie manager
@@ -252,6 +288,14 @@ class YouTubeDownloader(BaseDownloader):
             
             if cookie_options:
                 logger.info(f"[{self.platform}] Using cookies for metadata extraction")
+            
+            # Add proxy options if configured
+            from config.proxy_config import ProxyConfig
+            proxy_options = ProxyConfig.get_yt_dlp_proxy_options(self.platform)
+            ydl_opts_info.update(proxy_options)
+            
+            if proxy_options:
+                logger.info(f"[{self.platform}] Using proxy for metadata extraction")
             
             # Add retry mechanism for captcha errors
             import random
@@ -307,10 +351,13 @@ class YouTubeDownloader(BaseDownloader):
                         'remote_components': 'ejs:github',  # Enable EJS for challenge solving
                         'extractor_args': {
                             'youtube': {
-                                'player_client': ['tv_embedded', 'web'],
+                                'player_client': ['android', 'web', 'ios', 'mweb', 'android_embedded', 'ios_embedded', 'web_embedded'],
+                                'player_skip': ['webpage', 'configs'],
                             }
                         },
-                        'http_headers': self._get_realistic_headers()
+                        'http_headers': self._get_realistic_headers(),
+                        'sleep_interval_requests': 1.0,
+                        'sleep_interval': 2
                     }
                 })
             else:
@@ -339,10 +386,13 @@ class YouTubeDownloader(BaseDownloader):
                         'remote_components': 'ejs:github',  # Enable EJS for challenge solving
                         'extractor_args': {
                             'youtube': {
-                                'player_client': ['tv_embedded', 'web'],
+                                'player_client': ['android', 'web', 'ios', 'mweb', 'android_embedded', 'ios_embedded', 'web_embedded'],
+                                'player_skip': ['webpage', 'configs'],
                             }
                         },
-                        'http_headers': self._get_realistic_headers()
+                        'http_headers': self._get_realistic_headers(),
+                        'sleep_interval_requests': 1.0,
+                        'sleep_interval': 2
                     }
                 })
                 
@@ -357,10 +407,13 @@ class YouTubeDownloader(BaseDownloader):
                         'remote_components': 'ejs:github',  # Enable EJS for challenge solving
                         'extractor_args': {
                             'youtube': {
-                                'player_client': ['tv_embedded', 'web'],
+                                'player_client': ['android', 'web', 'ios', 'mweb', 'android_embedded', 'ios_embedded', 'web_embedded'],
+                                'player_skip': ['webpage', 'configs'],
                             }
                         },
-                        'http_headers': self._get_realistic_headers()
+                        'http_headers': self._get_realistic_headers(),
+                        'sleep_interval_requests': 1.0,
+                        'sleep_interval': 2
                     }
                 })
             
@@ -381,6 +434,14 @@ class YouTubeDownloader(BaseDownloader):
                 # Add cookies to download options using centralized manager
                 download_cookie_options = cookie_manager.get_ytdlp_options(self.platform)
                 download_info['opts'].update(download_cookie_options)
+                
+                # Add proxy options if configured
+                from config.proxy_config import ProxyConfig
+                download_proxy_options = ProxyConfig.get_yt_dlp_proxy_options(self.platform)
+                download_info['opts'].update(download_proxy_options)
+                
+                if download_proxy_options:
+                    logger.info(f"[{self.platform}] Using proxy for download")
                 
                 # Add retry mechanism for captcha errors during download
                 max_retries = 2

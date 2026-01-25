@@ -38,9 +38,12 @@ class YouTubeDownloader(BaseDownloader):
                 'remote_components': 'ejs:github',  # Enable EJS for challenge solving
                 'extractor_args': {
                     'youtube': {
-                        'player_client': ['tv_embedded', 'web'],
+                        'player_client': ['android', 'web', 'ios', 'mweb', 'android_embedded', 'ios_embedded', 'web_embedded'],
+                        'player_skip': ['webpage', 'configs'],
                     }
-                }
+                },
+                'sleep_interval_requests': 1.0,
+                'sleep_interval': 2
             }
             
             # Add cookies file if exists using centralized cookie manager
@@ -49,6 +52,14 @@ class YouTubeDownloader(BaseDownloader):
             
             if cookie_options:
                 logger.info(f"[{self.platform}] Using cookies for format detection")
+            
+            # Add proxy options if configured
+            from config.proxy_config import ProxyConfig
+            proxy_options = ProxyConfig.get_yt_dlp_proxy_options(self.platform)
+            ydl_opts.update(proxy_options)
+            
+            if proxy_options:
+                logger.info(f"[{self.platform}] Using proxy for format detection")
             
             with yt_dlp.YoutubeDL(ydl_opts) as ydl:
                 info = ydl.extract_info(url, download=False)
@@ -175,9 +186,12 @@ class YouTubeDownloader(BaseDownloader):
                 'remote_components': 'ejs:github',  # Enable EJS for challenge solving
                 'extractor_args': {
                     'youtube': {
-                        'player_client': ['tv_embedded', 'web'],
+                        'player_client': ['android', 'web', 'ios', 'mweb', 'android_embedded', 'ios_embedded', 'web_embedded'],
+                        'player_skip': ['webpage', 'configs'],
                     }
-                }
+                },
+                'sleep_interval_requests': 1.0,
+                'sleep_interval': 2
             }
             
             # Add cookies file if exists using centralized cookie manager
@@ -186,6 +200,14 @@ class YouTubeDownloader(BaseDownloader):
             
             if cookie_options:
                 logger.info(f"[{self.platform}] Using cookies for metadata extraction")
+            
+            # Add proxy options if configured
+            from config.proxy_config import ProxyConfig
+            proxy_options = ProxyConfig.get_yt_dlp_proxy_options(self.platform)
+            ydl_opts_info.update(proxy_options)
+            
+            if proxy_options:
+                logger.info(f"[{self.platform}] Using proxy for metadata extraction")
             
             with yt_dlp.YoutubeDL(ydl_opts_info) as ydl:
                 logger.info(f"[{self.platform}] Extracting video information...")
@@ -220,9 +242,12 @@ class YouTubeDownloader(BaseDownloader):
                         'remote_components': 'ejs:github',  # Enable EJS for challenge solving
                         'extractor_args': {
                             'youtube': {
-                                'player_client': ['tv_embedded', 'web'],
+                                'player_client': ['android', 'web', 'ios', 'mweb', 'android_embedded', 'ios_embedded', 'web_embedded'],
+                                'player_skip': ['webpage', 'configs'],
                             }
-                        }
+                        },
+                        'sleep_interval_requests': 1.0,
+                        'sleep_interval': 2
                     }
                 })
             else:
@@ -251,9 +276,12 @@ class YouTubeDownloader(BaseDownloader):
                         'remote_components': 'ejs:github',  # Enable EJS for challenge solving
                         'extractor_args': {
                             'youtube': {
-                                'player_client': ['tv_embedded', 'web'],
+                                'player_client': ['android', 'web', 'ios', 'mweb', 'android_embedded', 'ios_embedded', 'web_embedded'],
+                                'player_skip': ['webpage', 'configs'],
                             }
-                        }
+                        },
+                        'sleep_interval_requests': 1.0,
+                        'sleep_interval': 2
                     }
                 })
                 
@@ -268,9 +296,12 @@ class YouTubeDownloader(BaseDownloader):
                         'remote_components': 'ejs:github',  # Enable EJS for challenge solving
                         'extractor_args': {
                             'youtube': {
-                                'player_client': ['tv_embedded', 'web'],
+                                'player_client': ['android', 'web', 'ios', 'mweb', 'android_embedded', 'ios_embedded', 'web_embedded'],
+                                'player_skip': ['webpage', 'configs'],
                             }
-                        }
+                        },
+                        'sleep_interval_requests': 1.0,
+                        'sleep_interval': 2
                     }
                 })
             
@@ -282,6 +313,14 @@ class YouTubeDownloader(BaseDownloader):
                 # Add cookies to download options using centralized manager
                 download_cookie_options = cookie_manager.get_ytdlp_options(self.platform)
                 download_info['opts'].update(download_cookie_options)
+                
+                # Add proxy options if configured
+                from config.proxy_config import ProxyConfig
+                download_proxy_options = ProxyConfig.get_yt_dlp_proxy_options(self.platform)
+                download_info['opts'].update(download_proxy_options)
+                
+                if download_proxy_options:
+                    logger.info(f"[{self.platform}] Using proxy for download")
                 
                 with yt_dlp.YoutubeDL(download_info['opts']) as ydl:
                     ydl.download([url])
