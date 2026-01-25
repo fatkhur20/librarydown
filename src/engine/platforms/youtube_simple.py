@@ -54,12 +54,31 @@ class YouTubeDownloader(BaseDownloader):
                 logger.info(f"[{self.platform}] Using cookies for format detection")
             
             # Add proxy options if configured
-            from config.proxy_config import ProxyConfig
-            proxy_options = ProxyConfig.get_yt_dlp_proxy_options(self.platform)
-            ydl_opts.update(proxy_options)
+            from ..core.config import settings
+            import os
             
-            if proxy_options:
-                logger.info(f"[{self.platform}] Using proxy for format detection")
+            # Check if proxy is configured for this platform
+            proxy_config_path = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), 'config', 'proxy_config.py')
+            if os.path.exists(proxy_config_path):
+                import sys
+                from pathlib import Path
+                config_dir = Path(__file__).parent.parent.parent / "config"
+                sys.path.insert(0, str(config_dir))
+                try:
+                    import proxy_config
+                    proxy_options = proxy_config.ProxyConfig.get_yt_dlp_proxy_options(self.platform)
+                    ydl_opts.update(proxy_options)
+                    
+                    if proxy_options:
+                        logger.info(f"[{self.platform}] Using proxy for format detection")
+                except ImportError:
+                    logger.warning(f"[{self.platform}] Proxy config not available")
+                finally:
+                    # Remove the path we added to sys.path
+                    if str(config_dir) in sys.path:
+                        sys.path.remove(str(config_dir))
+            else:
+                logger.debug(f"[{self.platform}] Proxy config file not found")
             
             with yt_dlp.YoutubeDL(ydl_opts) as ydl:
                 info = ydl.extract_info(url, download=False)
@@ -202,12 +221,31 @@ class YouTubeDownloader(BaseDownloader):
                 logger.info(f"[{self.platform}] Using cookies for metadata extraction")
             
             # Add proxy options if configured
-            from config.proxy_config import ProxyConfig
-            proxy_options = ProxyConfig.get_yt_dlp_proxy_options(self.platform)
-            ydl_opts_info.update(proxy_options)
+            from ..core.config import settings
+            import os
             
-            if proxy_options:
-                logger.info(f"[{self.platform}] Using proxy for metadata extraction")
+            # Check if proxy is configured for this platform
+            proxy_config_path = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), 'config', 'proxy_config.py')
+            if os.path.exists(proxy_config_path):
+                import sys
+                from pathlib import Path
+                config_dir = Path(__file__).parent.parent.parent / "config"
+                sys.path.insert(0, str(config_dir))
+                try:
+                    import proxy_config
+                    proxy_options = proxy_config.ProxyConfig.get_yt_dlp_proxy_options(self.platform)
+                    ydl_opts_info.update(proxy_options)
+                    
+                    if proxy_options:
+                        logger.info(f"[{self.platform}] Using proxy for metadata extraction")
+                except ImportError:
+                    logger.warning(f"[{self.platform}] Proxy config not available")
+                finally:
+                    # Remove the path we added to sys.path
+                    if str(config_dir) in sys.path:
+                        sys.path.remove(str(config_dir))
+            else:
+                logger.debug(f"[{self.platform}] Proxy config file not found")
             
             with yt_dlp.YoutubeDL(ydl_opts_info) as ydl:
                 logger.info(f"[{self.platform}] Extracting video information...")
@@ -315,12 +353,31 @@ class YouTubeDownloader(BaseDownloader):
                 download_info['opts'].update(download_cookie_options)
                 
                 # Add proxy options if configured
-                from config.proxy_config import ProxyConfig
-                download_proxy_options = ProxyConfig.get_yt_dlp_proxy_options(self.platform)
-                download_info['opts'].update(download_proxy_options)
+                from ..core.config import settings
+                import os
                 
-                if download_proxy_options:
-                    logger.info(f"[{self.platform}] Using proxy for download")
+                # Check if proxy is configured for this platform
+                proxy_config_path = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), 'config', 'proxy_config.py')
+                if os.path.exists(proxy_config_path):
+                    import sys
+                    from pathlib import Path
+                    config_dir = Path(__file__).parent.parent.parent / "config"
+                    sys.path.insert(0, str(config_dir))
+                    try:
+                        import proxy_config
+                        download_proxy_options = proxy_config.ProxyConfig.get_yt_dlp_proxy_options(self.platform)
+                        download_info['opts'].update(download_proxy_options)
+                        
+                        if download_proxy_options:
+                            logger.info(f"[{self.platform}] Using proxy for download")
+                    except ImportError:
+                        logger.warning(f"[{self.platform}] Proxy config not available")
+                    finally:
+                        # Remove the path we added to sys.path
+                        if str(config_dir) in sys.path:
+                            sys.path.remove(str(config_dir))
+                else:
+                    logger.debug(f"[{self.platform}] Proxy config file not found")
                 
                 with yt_dlp.YoutubeDL(download_info['opts']) as ydl:
                     ydl.download([url])

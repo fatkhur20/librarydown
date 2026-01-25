@@ -20,12 +20,18 @@ class SystemMonitor:
     
     def get_system_stats(self) -> Dict[str, Any]:
         """Get current system statistics"""
+        try:
+            network_io = psutil.net_io_counters()._asdict() if psutil.net_io_counters() else {}
+        except (PermissionError, OSError):
+            # Handle cases where network counters are not accessible (e.g., in containers or restricted environments)
+            network_io = {}
+        
         stats = {
             "timestamp": datetime.utcnow().isoformat(),
             "cpu_percent": psutil.cpu_percent(interval=1),
             "memory_percent": psutil.virtual_memory().percent,
             "disk_usage": psutil.disk_usage('/').percent,
-            "network_io": psutil.net_io_counters()._asdict() if psutil.net_io_counters() else {},
+            "network_io": network_io,
             "process_count": len(psutil.pids()),
             "uptime_seconds": time.time() - psutil.boot_time()
         }
@@ -36,23 +42,29 @@ class SystemMonitor:
                 try:
                     path_stat = psutil.disk_usage(str(Path(path).resolve()))
                     stats[f'disk_usage_{path.replace("/", "_").strip("_")}'] = path_stat.percent
-                except:
-                    pass
+                except (PermissionError, OSError):
+                    # Handle cases where disk usage is not accessible
+                    stats[f'disk_usage_{path.replace("/", "_").strip("_")}'] = None
         
         return stats
     
     def get_process_stats(self) -> Dict[str, Any]:
         """Get process-specific statistics for LibraryDown"""
         processes = []
-        for proc in psutil.process_iter(['pid', 'name', 'cpu_percent', 'memory_percent', 'cmdline']):
-            try:
-                if 'librarydown' in ' '.join(proc.info['cmdline']) or \
-                   'celery' in proc.info['name'] or \
-                   'uvicorn' in proc.info['name'] or \
-                   'redis' in proc.info['name']:
-                    processes.append(proc.info)
-            except (psutil.NoSuchProcess, psutil.AccessDenied):
-                pass
+        try:
+            for proc in psutil.process_iter(['pid', 'name', 'cpu_percent', 'memory_percent', 'cmdline']):
+                try:
+                    if proc.info['cmdline'] and ('librarydown' in ' '.join(proc.info['cmdline']) or \
+                       'celery' in proc.info['name'] or \
+                       'uvicorn' in proc.info['name'] or \
+                       'redis' in proc.info['name']):
+                        processes.append(proc.info)
+                except (psutil.NoSuchProcess, psutil.AccessDenied, PermissionError):
+                    # Skip processes that cannot be accessed
+                    pass
+        except Exception:
+            # Handle case where process iteration fails completely
+            pass
         
         return {"processes": processes}
     
@@ -81,9 +93,17 @@ class SystemMonitor:
     def collect_stats(self) -> Dict[str, Any]:
         """Collect all statistics"""
         all_stats = {}
-        all_stats.update(self.get_system_stats())
-        all_stats.update(self.get_process_stats())
-        all_stats.update(self.get_app_stats())
+        try:
+            all_stats.update(self.get_system_stats())
+            all_stats.update(self.get_process_stats())
+            all_stats.update(self.get_app_stats())
+        except Exception as e:
+            print(f"Error collecting stats: {e}")
+            # Return minimal stats in case of error
+            all_stats = {
+                "timestamp": datetime.utcnow().isoformat(),
+                "error": f"Stats collection failed: {str(e)}"
+            }
         
         # Store in history
         self.stats_history['all'].append(all_stats)
@@ -91,7 +111,10 @@ class SystemMonitor:
             self.stats_history['all'].pop(0)
         
         # Save to file
-        self.save_stats_to_file(all_stats)
+        try:
+            self.save_stats_to_file(all_stats)
+        except Exception as e:
+            print(f"Error saving stats to file: {e}")
         
         return all_stats
     
@@ -129,7 +152,8 @@ class SystemMonitor:
                     time.sleep(interval)
                 except Exception as e:
                     print(f"Error in monitoring loop: {e}")
-                    time.sleep(interval)
+                    # Sleep for a shorter time when there's an error to avoid continuous errors
+                    time.sleep(min(interval, 10))
         
         self.monitor_thread = threading.Thread(target=monitor_loop, daemon=True)
         self.monitor_thread.start()
