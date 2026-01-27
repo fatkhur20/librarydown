@@ -8,6 +8,7 @@ from src.engine.base_downloader import BaseDownloader
 from src.core.config import settings
 from src.utils.cookie_manager import cookie_manager
 from src.utils.exceptions import handle_platform_exception
+from src.utils.token_refresher import get_latest_tokens
 from loguru import logger
 
 
@@ -100,9 +101,17 @@ class YouTubeDownloader(BaseDownloader):
                 }
             }
 
-            # Add PoToken and Visitor Data if available (Critical for avoiding bot detection)
-            po_token = os.getenv('YOUTUBE_PO_TOKEN')
-            visitor_data = os.getenv('YOUTUBE_VISITOR_DATA')
+            # Add PoToken and Visitor Data (Critical for avoiding bot detection)
+            # 1. Try to get from dynamic storage (refreshed by worker)
+            latest_tokens = get_latest_tokens()
+            po_token = latest_tokens.get('po_token')
+            visitor_data = latest_tokens.get('visitor_data')
+
+            # 2. Fallback to environment variables
+            if not po_token:
+                po_token = os.getenv('YOUTUBE_PO_TOKEN')
+            if not visitor_data:
+                visitor_data = os.getenv('YOUTUBE_VISITOR_DATA')
 
             if po_token:
                 logger.info(f"[{self.platform}] Using PoToken for format detection")
@@ -306,9 +315,17 @@ class YouTubeDownloader(BaseDownloader):
                 }
             }
 
-            # Add PoToken and Visitor Data if available
-            po_token = os.getenv('YOUTUBE_PO_TOKEN')
-            visitor_data = os.getenv('YOUTUBE_VISITOR_DATA')
+            # Add PoToken and Visitor Data
+            # 1. Try to get from dynamic storage (refreshed by worker)
+            latest_tokens = get_latest_tokens()
+            po_token = latest_tokens.get('po_token')
+            visitor_data = latest_tokens.get('visitor_data')
+
+            # 2. Fallback to environment variables
+            if not po_token:
+                po_token = os.getenv('YOUTUBE_PO_TOKEN')
+            if not visitor_data:
+                visitor_data = os.getenv('YOUTUBE_VISITOR_DATA')
 
             if po_token:
                 logger.info(f"[{self.platform}] Using PoToken for download")

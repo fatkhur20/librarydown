@@ -1,9 +1,29 @@
 from src.workers.celery_app import celery_app
 from src.core.platform_registry import PlatformRegistry
 from src.core.config import settings
+from src.utils.token_refresher import refresh_youtube_tokens
 from loguru import logger
 import asyncio
 from httpx import RequestError
+
+@celery_app.task(bind=True, name="refresh_youtube_tokens_task")
+def refresh_youtube_tokens_task(self):
+    """
+    Celery task to refresh YouTube tokens (PoToken, Visitor Data, Cookies).
+    Scheduled to run periodically.
+    """
+    logger.info("[Task] Starting scheduled YouTube token refresh...")
+    try:
+        success = asyncio.run(refresh_youtube_tokens())
+        if success:
+            logger.info("[Task] YouTube token refresh successful")
+            return "SUCCESS"
+        else:
+            logger.error("[Task] YouTube token refresh failed")
+            return "FAILURE"
+    except Exception as e:
+        logger.error(f"[Task] Error in token refresh task: {e}")
+        return f"ERROR: {str(e)}"
 
 @celery_app.task(
     bind=True,
