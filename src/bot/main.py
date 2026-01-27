@@ -25,18 +25,7 @@ import glob
 # Import our utilities
 from src.utils.url_validator import URLValidator
 from src.utils.security import security_validator
-from src.engine.platforms.youtube import YouTubeDownloader
-from src.engine.platforms.tiktok import TikTokDownloader
-from src.engine.platforms.instagram import InstagramDownloader
-from src.engine.platforms.soundcloud import SoundCloudDownloader
-from src.engine.platforms.dailymotion import DailymotionDownloader
-from src.engine.platforms.twitch import TwitchDownloader
-from src.engine.platforms.reddit import RedditDownloader
-from src.engine.platforms.vimeo import VimeoDownloader
-from src.engine.platforms.facebook import FacebookDownloader
-from src.engine.platforms.bilibili import BilibiliDownloader
-from src.engine.platforms.linkedin import LinkedInDownloader
-from src.engine.platforms.pinterest import PinterestDownloader
+from src.core.platform_registry import PlatformRegistry
 from src.core.config import settings
 from src.utils.user_features import user_preferences
 
@@ -51,22 +40,6 @@ class LibraryDownBot:
         self.user_id = os.getenv("TELEGRAM_USER_ID")
         self.media_folder = settings.MEDIA_FOLDER
         self.history_file = os.path.join(self.media_folder, "bot_history.json")
-        
-        # Platform mapping
-        self.platform_mapping = {
-            'youtube': YouTubeDownloader,
-            'tiktok': TikTokDownloader,
-            'instagram': InstagramDownloader,
-            'soundcloud': SoundCloudDownloader,
-            'dailymotion': DailymotionDownloader,
-            'twitch': TwitchDownloader,
-            'reddit': RedditDownloader,
-            'vimeo': VimeoDownloader,
-            'facebook': FacebookDownloader,
-            'bilibili': BilibiliDownloader,
-            'linkedin': LinkedInDownloader,
-            'pinterest': PinterestDownloader
-        }
         
         # Initialize bot
         self.application = ApplicationBuilder().token(self.token).build()
@@ -371,7 +344,7 @@ Enjoy downloading! 🚀
             return
         
         # Detect platform
-        platform = URLValidator.detect_platform(url)
+        platform = PlatformRegistry.detect_platform(url)
         if platform == "unknown":
             await update.message.reply_text("❌ Unsupported platform. Supported platforms:\nYouTube, TikTok, Instagram, SoundCloud, Dailymotion, Twitch, Reddit, Vimeo, Facebook, Bilibili, LinkedIn, Pinterest")
             return
@@ -381,12 +354,11 @@ Enjoy downloading! 🚀
         
         try:
             # Get appropriate downloader
-            downloader_class = self.platform_mapping.get(platform)
-            if not downloader_class:
+            try:
+                downloader = PlatformRegistry.get_downloader_by_platform(platform)
+            except ValueError:
                 await update.message.reply_text(f"❌ Download not implemented for {platform}")
                 return
-            
-            downloader = downloader_class()
             
             # Notify download in progress
             await update.message.reply_text("⏳ Downloading... This may take a moment.")
