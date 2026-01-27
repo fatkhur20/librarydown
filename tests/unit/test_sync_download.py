@@ -15,7 +15,7 @@ def test_sync_endpoint_exists():
     with TestClient(app) as client:
         # Test that the endpoint accepts the route
         # We'll use a mock to avoid actual downloading
-        with patch('src.api.endpoints.detect_platform') as mock_detect:
+        with patch('src.core.platform_registry.PlatformRegistry.detect_platform') as mock_detect:
             mock_detect.return_value = "youtube"
             
             # Should get a validation error about the URL format rather than a 404
@@ -26,12 +26,15 @@ def test_sync_endpoint_exists():
 
 def test_sync_download_with_mock():
     """Test sync download with mocked downloader."""
+    import uuid
     with TestClient(app) as client:
-        test_url = "https://www.youtube.com/watch?v=dQw4w9WgXcQ"
+        # Use unique video ID to avoid DB constraint errors
+        video_id = f"video_{uuid.uuid4().hex[:8]}"
+        test_url = f"https://www.youtube.com/watch?v={video_id}"
         
-        # Mock the YouTube downloader
-        with patch('src.api.endpoints.detect_platform') as mock_detect, \
-             patch('src.api.endpoints.YouTubeDownloader') as mock_downloader_class:
+        # Mock the downloader
+        with patch('src.core.platform_registry.PlatformRegistry.detect_platform') as mock_detect, \
+             patch('src.core.platform_registry.PlatformRegistry.get_downloader') as mock_get_downloader:
             
             mock_detect.return_value = "youtube"
             
@@ -40,19 +43,19 @@ def test_sync_download_with_mock():
             mock_downloader.download = MagicMock()
             mock_downloader.download.return_value = {
                 "platform": "youtube",
-                "id": "dQw4w9WgXcQ",
+                "id": video_id,
                 "title": "Test Video",
                 "media": {
                     "video": [
                         {
-                            "url": "http://localhost:8000/media/dQw4w9WgXcQ_720p.mp4",
+                            "url": f"http://localhost:8000/media/{video_id}_720p.mp4",
                             "quality": "720p"
                         }
                     ]
                 }
             }
             
-            mock_downloader_class.return_value = mock_downloader
+            mock_get_downloader.return_value = mock_downloader
             
             # Test the endpoint
             response = client.get(f"/api/v1/download-sync?url={test_url}&quality=720p")
@@ -67,8 +70,11 @@ def test_sync_download_unsupported_platform():
     with TestClient(app) as client:
         test_url = "https://unsupported-platform.com/video"
         
-        with patch('src.api.endpoints.detect_platform') as mock_detect:
+        with patch('src.core.platform_registry.PlatformRegistry.detect_platform') as mock_detect, \
+             patch('src.utils.security.security_validator.validate_url') as mock_validate:
+
             mock_detect.return_value = "unknown"
+            mock_validate.return_value = (True, "")
             
             response = client.get(f"/api/v1/download-sync?url={test_url}")
             assert response.status_code == 400
