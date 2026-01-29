@@ -15,14 +15,23 @@ async def refresh_youtube_tokens() -> bool:
     """
     try:
         from playwright.async_api import async_playwright
+        from playwright_stealth import Stealth
 
         logger.info("Starting YouTube token refresh...")
 
         async with async_playwright() as p:
+            # Configure proxy if set
+            proxy_config = None
+            proxy_url = os.getenv("PROXY_URL")
+            if proxy_url:
+                logger.info(f"Using proxy: {proxy_url}")
+                proxy_config = {"server": proxy_url}
+
             # Launch browser (chromium)
             # args are optimized for running in container/headless
             browser = await p.chromium.launch(
                 headless=True,
+                proxy=proxy_config,
                 args=[
                     '--no-sandbox',
                     '--disable-setuid-sandbox',
@@ -43,23 +52,44 @@ async def refresh_youtube_tokens() -> bool:
 
             page = await context.new_page()
 
-            # Navigate to YouTube Music (usually lighter and triggers same config)
-            logger.info("Navigating to YouTube Music...")
-            await page.goto("https://music.youtube.com", timeout=60000, wait_until="networkidle")
+            # Apply stealth measures
+            stealth = Stealth()
+            await stealth.apply_stealth_async(page)
 
-            # Wait a bit for scripts to initialize
-            await asyncio.sleep(5)
+            # Retry mechanism
+            max_retries = 3
+            success = False
 
-            # Extract PoToken and Visitor Data using JavaScript
-            logger.info("Extracting tokens...")
+            for attempt in range(max_retries):
+                try:
+                    # Navigate to YouTube Music (usually lighter and triggers same config)
+                    logger.info(f"Navigating to YouTube Music (Attempt {attempt + 1}/{max_retries})...")
+                    await page.goto("https://music.youtube.com", timeout=60000, wait_until="networkidle")
 
-            try:
-                po_token = await page.evaluate("() => window.yt && window.yt.config_ && window.yt.config_.PO_TOKEN")
-                visitor_data = await page.evaluate("() => window.yt && window.yt.config_ && window.yt.config_.VISITOR_DATA")
-            except Exception as e:
-                logger.warning(f"Failed to extract via direct JS execution: {e}")
-                po_token = None
-                visitor_data = None
+                    # Wait a bit for scripts to initialize
+                    await asyncio.sleep(5)
+
+                    # Extract PoToken and Visitor Data using JavaScript
+                    logger.info("Extracting tokens...")
+
+                    po_token = await page.evaluate("() => window.yt && window.yt.config_ && window.yt.config_.PO_TOKEN")
+                    visitor_data = await page.evaluate("() => window.yt && window.yt.config_ && window.yt.config_.VISITOR_DATA")
+
+                    # If we got tokens, break the loop
+                    if po_token and visitor_data:
+                        success = True
+                        break
+                    else:
+                        logger.warning(f"Attempt {attempt + 1}: Tokens found incomplete (Po: {bool(po_token)}, Visitor: {bool(visitor_data)})")
+
+                except Exception as e:
+                    logger.warning(f"Attempt {attempt + 1} failed: {e}")
+                    await asyncio.sleep(5) # Wait before retry
+
+            if not success:
+                logger.error("Failed to retrieve tokens after all retries.")
+                await browser.close()
+                return False
 
             # Get cookies
             cookies = await context.cookies()
