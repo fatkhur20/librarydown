@@ -71,6 +71,17 @@ async def startup_event():
         initial_stats = monitor.get_system_stats()
         logger.info(f"Initial system stats - CPU: {initial_stats.get('cpu_percent')}%, Memory: {initial_stats.get('memory_percent')}%, Disk: {initial_stats.get('disk_usage')}%")
 
+    # Check for YouTube tokens on startup
+    token_path = os.path.join(os.getcwd(), "data", "youtube_tokens.json")
+    if not os.path.exists(token_path):
+        logger.warning("YouTube tokens not found. Triggering initial token refresh task...")
+        try:
+            from src.workers.tasks import refresh_youtube_tokens_task
+            refresh_youtube_tokens_task.delay()
+            logger.info("Initial token refresh task queued.")
+        except Exception as e:
+            logger.error(f"Failed to queue initial token refresh: {e}")
+
 @app.on_event("shutdown")
 async def shutdown_event():
     logger.info(f"{settings.APP_NAME} is shutting down...")
