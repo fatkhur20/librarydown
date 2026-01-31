@@ -5,7 +5,7 @@ from slowapi import Limiter, _rate_limit_exceeded_handler
 from slowapi.util import get_remote_address
 from slowapi.errors import RateLimitExceeded
 from src.core.config import settings
-from src.api.endpoints import router as api_router
+from src.api.routers import downloads, system, media
 from src.database.base import engine, Base
 from loguru import logger
 from src.utils.logging.monitor import monitor
@@ -48,7 +48,9 @@ app.add_middleware(
 app.mount("/media", StaticFiles(directory=settings.MEDIA_FOLDER), name="media")
 
 # Include API routes
-app.include_router(api_router, prefix=settings.API_V1_STR)
+app.include_router(downloads.router, prefix=settings.API_V1_STR, tags=["Downloads"])
+app.include_router(system.router, prefix=settings.API_V1_STR, tags=["System"])
+app.include_router(media.router, prefix=settings.API_V1_STR, tags=["Media"])
 
 @app.on_event("startup")
 async def startup_event():
@@ -68,6 +70,17 @@ async def startup_event():
         # Log initial system stats
         initial_stats = monitor.get_system_stats()
         logger.info(f"Initial system stats - CPU: {initial_stats.get('cpu_percent')}%, Memory: {initial_stats.get('memory_percent')}%, Disk: {initial_stats.get('disk_usage')}%")
+
+    # Check for YouTube tokens on startup
+    token_path = os.path.join(os.getcwd(), "data", "youtube_tokens.json")
+    if not os.path.exists(token_path):
+        logger.warning("YouTube tokens not found. Triggering initial token refresh task...")
+        try:
+            from src.workers.tasks import refresh_youtube_tokens_task
+            refresh_youtube_tokens_task.delay()
+            logger.info("Initial token refresh task queued.")
+        except Exception as e:
+            logger.error(f"Failed to queue initial token refresh: {e}")
 
 @app.on_event("shutdown")
 async def shutdown_event():

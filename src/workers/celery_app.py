@@ -27,5 +27,9 @@ celery_app.conf.update(
             'task': 'src.workers.cleanup.cleanup_old_files',
             'schedule': crontab(hour='*/1', minute=0),  # Run every hour
         },
+        'refresh-youtube-tokens': {
+            'task': 'refresh_youtube_tokens_task',
+            'schedule': crontab(hour='*/6', minute=0),  # Run every 6 hours
+        },
     },
 )

@@ -85,6 +85,10 @@ install_deps() {
         pip3 install python-telegram-bot --index-url https://pypi.org/simple
     fi
     
+    # Install Playwright browsers
+    echo "[INFO] Installing Playwright browsers..."
+    playwright install chromium
+
     echo "[SUCCESS] Dependencies installed"
 }
 

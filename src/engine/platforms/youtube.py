@@ -8,6 +8,7 @@ from src.engine.base_downloader import BaseDownloader
 from src.core.config import settings
 from src.utils.cookie_manager import cookie_manager
 from src.utils.exceptions import handle_platform_exception
+from src.utils.token_refresher import get_latest_tokens
 from loguru import logger
 
 
@@ -43,14 +44,14 @@ class YouTubeDownloader(BaseDownloader):
         import random
         
         user_agents = [
-            'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-            'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-            'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-            'Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:121.0) Gecko/20100101 Firefox/121.0',
-            'Mozilla/5.0 (Macintosh; Intel Mac OS X 10.15; rv:121.0) Gecko/20100101 Firefox/121.0',
-            'Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:121.0) Gecko/20100101 Firefox/121.0',
-            'Mozilla/5.0 (iPhone; CPU iPhone OS 17_1_2 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.1.2 Mobile/15E148 Safari/604.1',
-            'Mozilla/5.0 (Android 13; Mobile; rv:121.0) Gecko/121.0 Firefox/121.0'
+            'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36',
+            'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36',
+            'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36',
+            'Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:127.0) Gecko/20100101 Firefox/127.0',
+            'Mozilla/5.0 (Macintosh; Intel Mac OS X 10.15; rv:127.0) Gecko/20100101 Firefox/127.0',
+            'Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:127.0) Gecko/20100101 Firefox/127.0',
+            'Mozilla/5.0 (iPhone; CPU iPhone OS 17_5_1 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.5 Mobile/15E148 Safari/604.1',
+            'Mozilla/5.0 (Android 14; Mobile; rv:127.0) Gecko/127.0 Firefox/127.0'
         ]
         
         referers = [
@@ -93,17 +94,39 @@ class YouTubeDownloader(BaseDownloader):
             # Simulate browser-like behavior before making request
             self._simulate_browser_behavior("page_load")
             
+            extractor_args = {
+                'youtube': {
+                    'player_client': ['android', 'web', 'ios', 'mweb', 'android_embedded', 'ios_embedded', 'web_embedded'],
+                    'player_skip': ['webpage', 'configs'],
+                }
+            }
+
+            # Add PoToken and Visitor Data (Critical for avoiding bot detection)
+            # 1. Try to get from dynamic storage (refreshed by worker)
+            latest_tokens = get_latest_tokens()
+            po_token = latest_tokens.get('po_token')
+            visitor_data = latest_tokens.get('visitor_data')
+
+            # 2. Fallback to environment variables
+            if not po_token:
+                po_token = os.getenv('YOUTUBE_PO_TOKEN')
+            if not visitor_data:
+                visitor_data = os.getenv('YOUTUBE_VISITOR_DATA')
+
+            if po_token:
+                logger.info(f"[{self.platform}] Using PoToken for format detection")
+                extractor_args['youtube']['po_token'] = [po_token]
+
+            if visitor_data:
+                logger.info(f"[{self.platform}] Using Visitor Data for format detection")
+                extractor_args['youtube']['visitor_data'] = [visitor_data]
+
             ydl_opts = {
                 'quiet': True,
                 'no_warnings': True,
                 'skip_download': True,
                 'remote_components': 'ejs:github',  # Enable EJS for challenge solving
-                'extractor_args': {
-                    'youtube': {
-                        'player_client': ['android', 'web', 'ios', 'mweb', 'android_embedded', 'ios_embedded', 'web_embedded'],
-                        'player_skip': ['webpage', 'configs'],
-                    }
-                },
+                'extractor_args': extractor_args,
                 'http_headers': self._get_realistic_headers(),
                 'sleep_interval_requests': 1.0,
                 'sleep_interval': 2
@@ -284,18 +307,41 @@ class YouTubeDownloader(BaseDownloader):
             # Check if audio-only is requested
             is_audio_only = quality.lower() == 'audio'
             
+            # Prepare extractor arguments (reused for both metadata and download)
+            extractor_args = {
+                'youtube': {
+                    'player_client': ['android', 'web', 'ios', 'mweb', 'android_embedded', 'ios_embedded', 'web_embedded'],
+                    'player_skip': ['webpage', 'configs'],
+                }
+            }
+
+            # Add PoToken and Visitor Data
+            # 1. Try to get from dynamic storage (refreshed by worker)
+            latest_tokens = get_latest_tokens()
+            po_token = latest_tokens.get('po_token')
+            visitor_data = latest_tokens.get('visitor_data')
+
+            # 2. Fallback to environment variables
+            if not po_token:
+                po_token = os.getenv('YOUTUBE_PO_TOKEN')
+            if not visitor_data:
+                visitor_data = os.getenv('YOUTUBE_VISITOR_DATA')
+
+            if po_token:
+                logger.info(f"[{self.platform}] Using PoToken for download")
+                extractor_args['youtube']['po_token'] = [po_token]
+
+            if visitor_data:
+                logger.info(f"[{self.platform}] Using Visitor Data for download")
+                extractor_args['youtube']['visitor_data'] = [visitor_data]
+
             # Get video metadata first
             ydl_opts_info = {
                 'quiet': True,
                 'no_warnings': True,
                 'skip_download': True,
                 'remote_components': 'ejs:github',  # Enable EJS for challenge solving
-                'extractor_args': {
-                    'youtube': {
-                        'player_client': ['android', 'web', 'ios', 'mweb', 'android_embedded', 'ios_embedded', 'web_embedded'],
-                        'player_skip': ['webpage', 'configs'],
-                    }
-                },
+                'extractor_args': extractor_args,
                 'http_headers': self._get_realistic_headers(),
                 'sleep_interval_requests': 1.0,
                 'sleep_interval': 2
@@ -387,12 +433,7 @@ class YouTubeDownloader(BaseDownloader):
                         'no_warnings': True,
                         'outtmpl': os.path.join(settings.MEDIA_FOLDER, f'{video_id}_audio.%(ext)s'),
                         'remote_components': 'ejs:github',  # Enable EJS for challenge solving
-                        'extractor_args': {
-                            'youtube': {
-                                'player_client': ['android', 'web', 'ios', 'mweb', 'android_embedded', 'ios_embedded', 'web_embedded'],
-                                'player_skip': ['webpage', 'configs'],
-                            }
-                        },
+                        'extractor_args': extractor_args,
                         'http_headers': self._get_realistic_headers(),
                         'sleep_interval_requests': 1.0,
                         'sleep_interval': 2
@@ -422,12 +463,7 @@ class YouTubeDownloader(BaseDownloader):
                         'merge_output_format': 'mp4',
                         'outtmpl': os.path.join(settings.MEDIA_FOLDER, f'{video_id}.%(ext)s'),
                         'remote_components': 'ejs:github',  # Enable EJS for challenge solving
-                        'extractor_args': {
-                            'youtube': {
-                                'player_client': ['android', 'web', 'ios', 'mweb', 'android_embedded', 'ios_embedded', 'web_embedded'],
-                                'player_skip': ['webpage', 'configs'],
-                            }
-                        },
+                        'extractor_args': extractor_args,
                         'http_headers': self._get_realistic_headers(),
                         'sleep_interval_requests': 1.0,
                         'sleep_interval': 2
@@ -443,12 +479,7 @@ class YouTubeDownloader(BaseDownloader):
                         'no_warnings': True,
                         'outtmpl': os.path.join(settings.MEDIA_FOLDER, f'{video_id}_audio.%(ext)s'),
                         'remote_components': 'ejs:github',  # Enable EJS for challenge solving
-                        'extractor_args': {
-                            'youtube': {
-                                'player_client': ['android', 'web', 'ios', 'mweb', 'android_embedded', 'ios_embedded', 'web_embedded'],
-                                'player_skip': ['webpage', 'configs'],
-                            }
-                        },
+                        'extractor_args': extractor_args,
                         'http_headers': self._get_realistic_headers(),
                         'sleep_interval_requests': 1.0,
                         'sleep_interval': 2
